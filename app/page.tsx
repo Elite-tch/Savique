@@ -2,38 +2,33 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Shield, Users, Wallet } from "lucide-react";
 
 export default function LandingPage() {
     return (
-        <div className="min-h-screen flex flex-col bg-background">
+        <div className="min-h-screen flex flex-col ">
             {/* Header */}
-            <header className="fixed top-0 w-full z-50 glass border-b border-white/5 backdrop-blur-md bg-black/50">
-                <div className="container mx-auto px-6 h-20 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                            <Shield className="w-5 h-5 text-white" />
+            <header className="fixed top-4 left-1/2 -translate-x-1/2 w-[90%] md:w-[60%] lg:w-[30%] z-50 rounded-full glass border border-white/10 backdrop-blur-md bg-black/60 shadow-xl shadow-black/20">
+                <div className="w-full px-6 h-16 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="relative w-8 h-8 rounded-lg overflow-hidden flex-shrink-0">
+                            <Image
+                                src="/logo.png"
+                                alt="SafeVault Logo"
+                                fill
+                                className="object-contain"
+                            />
                         </div>
-                        <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
+                        <span className="text-xl font-bold font-display bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
                             SafeVault
                         </span>
                     </div>
 
-                    <nav className="hidden md:flex items-center gap-8">
-                        <Link href="#how-it-works" className="text-sm text-gray-400 hover:text-white transition-colors">
-                            How it Works
-                        </Link>
-                        <Link href="#why-flare" className="text-sm text-gray-400 hover:text-white transition-colors">
-                            Why Flare
-                        </Link>
-                        <Link href="/support" className="text-sm text-gray-400 hover:text-white transition-colors">
-                            Support
-                        </Link>
-                    </nav>
-
                     <Link href="/dashboard">
-                        <Button size="sm">
+                        <Button size="sm"
+                        className="rounded-full">
                             Launch App
                         </Button>
                     </Link>

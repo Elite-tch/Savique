@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { Shield, LayoutDashboard, PlusCircle, History, LogOut, Wallet, User, Lock } from "lucide-react";
 
@@ -57,14 +58,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div className="min-h-screen flex bg-black text-white selection:bg-primary/30">
             {/* Sidebar */}
             <aside className="w-64 border-r border-white/10 flex flex-col fixed h-full glass z-20">
-                <div className="h-20 flex items-center gap-3 px-6 border-b border-white/5">
-                    <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center shadow-lg shadow-primary/20">
-                        <Shield className="w-5 h-5 text-white" />
+                <Link href="/">
+                    <div className="h-20 flex items-center gap-3 px-6 border-b border-white/5">
+                        <div className="relative w-8 h-8 rounded-lg overflow-hidden flex-shrink-0">
+                            <Image
+                                src="/logo.png"
+                                alt="SafeVault Logo"
+                                fill
+                                className="object-contain"
+                            />
+                        </div>
+                        <span className="text-xl font-bold font-display bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
+                            SafeVault
+                        </span>
                     </div>
-                    <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
-                        SafeVault
-                    </span>
-                </div>
+                </Link>
 
                 <nav className="flex-1 px-4 py-8 space-y-2">
                     <p className="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">Menu</p>
