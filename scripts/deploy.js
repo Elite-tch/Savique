@@ -22,7 +22,7 @@ async function main() {
     // Deploy VaultFactory
     console.log("📦 Deploying VaultFactory...");
     const VaultFactory = await ethers.getContractFactory("VaultFactory");
-    const factory = await VaultFactory.deploy(protocolTreasury);
+    const factory = await VaultFactory.deploy(USDT_ADDRESS, protocolTreasury);
     await factory.waitForDeployment();
 
     const factoryAddress = await factory.getAddress();

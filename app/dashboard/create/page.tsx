@@ -1,23 +1,38 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Clock, AlertTriangle, Coins, Lock, Calendar, TrendingUp, Info, Plus, Wallet, Receipt } from "lucide-react";
+import { ArrowLeft, Clock, AlertTriangle, Coins, Lock, Calendar, TrendingUp, Info, Plus, Wallet, Receipt, Loader2, Check } from "lucide-react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useWriteContract, useWaitForTransactionReceipt, useAccount, useBalance } from "wagmi";
-import { CONTRACTS, VAULT_FACTORY_ABI } from "@/lib/contracts";
+import { useWriteContract, useWaitForTransactionReceipt, useAccount, useBalance, useReadContract, usePublicClient } from "wagmi";
+import { CONTRACTS, VAULT_FACTORY_ABI, ERC20_ABI, VAULT_ABI } from "@/lib/contracts";
 import { toast } from "sonner";
-import { useEffect } from "react";
-import { parseEther, formatEther } from "viem";
+import { parseUnits, formatUnits, decodeEventLog } from "viem";
 import { useProofRails } from "@proofrails/sdk/react";
+import { saveReceipt } from "@/lib/receiptService";
 
 export default function CreatePersonalVault() {
     const router = useRouter();
     const { address, isConnected } = useAccount();
-    const { data: balance } = useBalance({ address });
+    const publicClient = usePublicClient();
+
+    // USDT Balance
+    const { data: balance } = useReadContract({
+        address: CONTRACTS.coston2.USDTToken,
+        abi: ERC20_ABI,
+        functionName: 'balanceOf',
+        args: [address as `0x${string}`],
+        query: { enabled: !!address },
+    });
+
+    const { data: decimals } = useReadContract({
+        address: CONTRACTS.coston2.USDTToken,
+        abi: ERC20_ABI,
+        functionName: 'decimals',
+    });
 
     const [formData, setFormData] = useState({
         purpose: "",
@@ -27,6 +42,13 @@ export default function CreatePersonalVault() {
 
     const [customDuration, setCustomDuration] = useState("");
     const FIXED_PENALTY = 10; // Fixed 10% penalty
+    const toastId = useRef<string | number | null>(null);
+
+    // Multi-step state
+    type Step = 'idle' | 'creating' | 'approving' | 'depositing' | 'generating_proof' | 'done';
+    const [currentStep, setCurrentStep] = useState<Step>('idle');
+    const [createdVaultAddress, setCreatedVaultAddress] = useState<`0x${string}` | null>(null);
+    const [txHash, setTxHash] = useState<`0x${string}` | undefined>(undefined);
 
     // Brand Styled Toast
     const toastStyle = {
@@ -38,130 +60,232 @@ export default function CreatePersonalVault() {
         }
     };
 
-    const { writeContract, data: hash, isPending, error: writeError } = useWriteContract();
-    const { isLoading: isConfirming, isSuccess, data: receipt } = useWaitForTransactionReceipt({ hash });
+    const { writeContract, error: writeError } = useWriteContract();
+    const { isLoading: isConfirming, isSuccess, data: receipt } = useWaitForTransactionReceipt({ hash: txHash });
 
     // ProofRails Integration
-    const [proofStatus, setProofStatus] = useState<'idle' | 'generating' | 'done' | 'error'>('idle');
     const sdk = useProofRails();
 
+    // Reset loop when transaction succeeds
     useEffect(() => {
-        if (isSuccess && receipt && proofStatus === 'idle') {
-            toast.success("Transaction Successful", toastStyle);
-            const generateProof = async () => {
-                setProofStatus('generating');
-                try {
-                    console.log("🔄 Starting ProofRails receipt generation...");
-                    console.log("API Key present:", !!process.env.NEXT_PUBLIC_PROOFRAILS_KEY);
+        const processStep = async () => {
+            if (isSuccess && receipt) {
+                if (currentStep === 'creating') {
+                    // 1. Vault Created - Find address
+                    // We need to parse logs to find the PersonalVaultCreated event
+                    // or just query getUserVaults but logs are better
+                    // For simplicity, let's fetch the user's latest vault
+                    // But events are safer.
+                    // Let's try to decode logs if possible, or just fetch last vault
+                    try {
+                        // Find the event
+                        // For now, simpler approach: fetch user vaults and get last one
+                        // But we can't do that easily inside useEffect without another hook.
+                        // Let's assume the last log is the one or verify efficiently?
+                        // Better: Parse logs properly
 
-                    // Create a "Savings" receipt using payment template
-                    const receiptResult = await sdk.templates.payment({
-                        amount: parseFloat(formData.amount),
-                        from: receipt.from,
-                        to: receipt.to || CONTRACTS.coston2.VaultFactory,
-                        purpose: `SafeVault: ${formData.purpose}`,
-                        transactionHash: receipt.transactionHash
-                    });
+                        // Simple workaround: Just get the last vault from the factory which we know belongs to user? 
+                        // No, better to decode log.
 
-                    console.log("✅ ProofRails Receipt Created:", receiptResult);
+                        // Let's try fetching the vaults again
+                        const userVaults = await publicClient!.readContract({
+                            address: CONTRACTS.coston2.VaultFactory,
+                            abi: VAULT_FACTORY_ABI,
+                            functionName: 'getUserVaults',
+                            args: [address!]
+                        });
+                        const newVault = userVaults[userVaults.length - 1]; // Assume last one is ours
+                        setCreatedVaultAddress(newVault);
 
-                    // Always store receipt data for history viewing
-                    const receiptData = {
-                        id: receiptResult?.id || `local_${receipt.transactionHash}`,
-                        txHash: receipt.transactionHash,
-                        timestamp: Date.now(),
-                        purpose: formData.purpose,
-                        amount: formData.amount,
-                        verified: !!receiptResult?.id,
-                        type: 'created'
-                    };
-                    localStorage.setItem(`receipt_${receipt.transactionHash}`, JSON.stringify(receiptData));
-                    console.log("💾 Receipt stored in localStorage:", receiptData);
-
-
-
-                    setProofStatus('done');
-                    toast.success("Receipt Generated", toastStyle);
-                    // Delay redirect to show success state
-                    setTimeout(() => router.push("/dashboard/vaults"), 1500);
-                } catch (e: any) {
-                    console.error("❌ Proof generation failed:", e);
-                    // ... logs
-
-                    // Even on error, store the transaction for history
-                    const fallbackReceipt = {
-                        id: `local_${receipt.transactionHash}`,
-                        txHash: receipt.transactionHash,
-                        timestamp: Date.now(),
-                        purpose: formData.purpose,
-                        amount: formData.amount,
-                        verified: false,
-                        type: 'created'
-                    };
-                    localStorage.setItem(`receipt_${receipt.transactionHash}`, JSON.stringify(fallbackReceipt));
-
-                    toast.error("Receipt Generation Failed", toastStyle);
-
-                    setProofStatus('error');
-                    setTimeout(() => router.push("/dashboard/vaults"), 2000);
+                        toast.success("Vault Created! Now approve USDT.", toastStyle);
+                        setCurrentStep('approving');
+                        handleApprove(newVault);
+                    } catch (e) {
+                        console.error("Error finding new vault:", e);
+                        toast.error("Could not find new vault address", toastStyle);
+                        setCurrentStep('idle');
+                    }
+                } else if (currentStep === 'approving') {
+                    // 2. Approved - Move to Deposit
+                    toast.success("USDT Approved! Now depositing...", toastStyle);
+                    setCurrentStep('depositing');
+                    handleDeposit(createdVaultAddress!);
+                } else if (currentStep === 'depositing') {
+                    // 3. Deposited - Generate Proof
+                    toast.success("Deposit Successful!", toastStyle);
+                    setCurrentStep('generating_proof');
+                    handleProofGeneration(receipt.transactionHash);
                 }
-            };
-            generateProof();
+            }
+        };
+
+        if (isSuccess && receipt) {
+            processStep();
         }
-    }, [isSuccess, receipt, proofStatus, sdk, formData.amount, formData.purpose, router]);
+    }, [isSuccess, receipt]);
+
+    // Error handling
+    useEffect(() => {
+        if (writeError) {
+            console.error("Write error:", writeError);
+            toast.error(`Transaction Failed: ${writeError.message.split('\n')[0]}`, toastStyle);
+            // Reset to idle or previous step? allows retry
+            setTxHash(undefined);
+            // keep current step to retry
+        }
+    }, [writeError]);
+
+    const handleCreate = async () => {
+        if (!address) return;
+
+        try {
+            setCurrentStep('creating');
+            toastId.current = toast.loading("Creating Vault...", toastStyle);
+
+            const durationDays = customDuration ? parseInt(customDuration) : parseInt(formData.duration);
+            const unlockTimestamp = Math.floor(Date.now() / 1000) + (durationDays * 24 * 60 * 60);
+            const penaltyBps = FIXED_PENALTY * 100;
+
+            writeContract({
+                address: CONTRACTS.coston2.VaultFactory,
+                abi: VAULT_FACTORY_ABI,
+                functionName: "createPersonalVault",
+                args: [formData.purpose, BigInt(unlockTimestamp), BigInt(penaltyBps)]
+            }, {
+                onSuccess: (hash) => setTxHash(hash)
+            });
+        } catch (e) {
+            console.error(e);
+            setCurrentStep('idle');
+        }
+    };
+
+    const handleApprove = (spender: `0x${string}`) => {
+        try {
+            toastId.current = toast.loading("Approving USDT...", toastStyle);
+            const amountUnits = parseUnits(formData.amount, decimals || 18); // USDT decimals
+
+            writeContract({
+                address: CONTRACTS.coston2.USDTToken,
+                abi: ERC20_ABI,
+                functionName: "approve",
+                args: [spender, amountUnits]
+            }, {
+                onSuccess: (hash) => setTxHash(hash)
+            });
+        } catch (e) {
+            console.error(e);
+            // stay in approving step
+        }
+    };
+
+    const handleDeposit = (vaultAddr: `0x${string}`) => {
+        try {
+            toastId.current = toast.loading("Depositing USDT...", toastStyle);
+            const amountUnits = parseUnits(formData.amount, decimals || 18);
+
+            writeContract({
+                address: vaultAddr,
+                abi: VAULT_ABI,
+                functionName: "deposit",
+                args: [amountUnits]
+            }, {
+                onSuccess: (hash) => setTxHash(hash)
+            });
+        } catch (e) {
+            console.error(e);
+            // stay in depositing
+        }
+    };
+
+    const handleProofGeneration = async (txHashStr: string) => {
+        try {
+            console.log("🔄 Starting ProofRails receipt generation...");
+
+            // Create a "Savings" receipt
+            const receiptResult = await sdk.templates.payment({
+                amount: parseFloat(formData.amount),
+                from: address!,
+                to: createdVaultAddress!,
+                purpose: `SafeVault: ${formData.purpose}`,
+                transactionHash: txHashStr
+            });
+
+            console.log("✅ ProofRails Receipt Created:", receiptResult);
+
+            // Save receipt to Firestore
+            await saveReceipt({
+                walletAddress: address!.toLowerCase(),
+                txHash: txHashStr,
+                timestamp: Date.now(),
+                purpose: formData.purpose,
+                amount: formData.amount,
+                verified: !!receiptResult?.id,
+                type: 'created',
+                proofRailsId: receiptResult?.id
+            });
+
+            setCurrentStep('done');
+            toast.success("All Done! Vault Created.", toastStyle);
+            setTimeout(() => router.push("/dashboard/vaults"), 1500);
+        } catch (e: any) {
+            console.error("❌ Proof generation failed:", e);
+
+            // Even on error, save the transaction
+            await saveReceipt({
+                walletAddress: address!.toLowerCase(),
+                txHash: txHashStr,
+                timestamp: Date.now(),
+                purpose: formData.purpose,
+                amount: formData.amount,
+                verified: false,
+                type: 'created'
+            });
+
+            toast.error("Receipt Gen Failed but Vault Created", toastStyle);
+            setCurrentStep('done');
+            setTimeout(() => router.push("/dashboard/vaults"), 2000);
+        }
+    };
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-
         if (!isConnected || !address) {
             alert("Please connect your wallet first");
             return;
         }
-
         if (!formData.amount || parseFloat(formData.amount) <= 0) {
             alert("Please enter a valid deposit amount");
             return;
         }
 
-        const durationDays = customDuration ? parseInt(customDuration) : parseInt(formData.duration);
-        const unlockTimestamp = Math.floor(Date.now() / 1000) + (durationDays * 24 * 60 * 60);
-        const penaltyBps = FIXED_PENALTY * 100; // Fixed 10% = 1000 bps
-        const amountWei = parseEther(formData.amount);
-
-        try {
-            toast.loading("Initializing Transaction...", toastStyle);
-            writeContract({
-                address: CONTRACTS.coston2.VaultFactory,
-                abi: VAULT_FACTORY_ABI,
-                functionName: "createPersonalVault",
-                args: [
-                    formData.purpose,
-                    BigInt(unlockTimestamp),
-                    BigInt(penaltyBps)
-                ],
-                value: amountWei
-            });
-        } catch (error) {
-            console.error("Error:", error);
-        }
+        handleCreate();
     };
 
     const durationDays = customDuration ? parseInt(customDuration) : parseInt(formData.duration);
     const unlockDate = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000);
     const potentialPenalty = formData.amount ? (parseFloat(formData.amount) * FIXED_PENALTY / 100).toFixed(4) : "0";
 
+    // UI Helpers
+    const isProcessing = currentStep !== 'idle' && currentStep !== 'done';
+    const getButtonText = () => {
+        if (currentStep === 'creating') return "Creating Vault...";
+        if (currentStep === 'approving') return "Approving USDT0...";
+        if (currentStep === 'depositing') return "Depositing USDT0...";
+        if (currentStep === 'generating_proof') return "Finalizing Receipt...";
+        if (currentStep === 'done') return "Redirecting...";
+        return "Create & Lock Funds";
+    };
+
     return (
         <div className="max-w-4xl mx-auto">
-            {/* Direct Vault Creation - No Back Button Needed anymore if this is the only option */}
-
             <div className="grid md:grid-cols-3 gap-6">
                 {/* Main Form */}
                 <div className="md:col-span-2">
                     <Card className="p-8">
                         <div className="mb-8">
-
-                            <h2 className="text-3xl font-bold text-white mb-2">Create Personal Vault</h2>
-                            <p className="text-gray-400">Lock your C2FLR with time-based penalties to enforce savings discipline</p>
+                            <h2 className="text-3xl font-bold text-white mb-2">Create USDT0 Vault</h2>
+                            <p className="text-gray-400">Lock your USDT0 with time-based penalties to enforce savings discipline</p>
                         </div>
 
                         <form onSubmit={handleSubmit} className="space-y-6">
@@ -173,14 +297,14 @@ export default function CreatePersonalVault() {
                                 </label>
                                 <input
                                     type="text"
-                                    placeholder="e.g., New Laptop, Emergency Fund, Vacation"
+                                    placeholder="e.g., New Laptop, Emergency Fund"
                                     required
                                     maxLength={50}
-                                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder:text-gray-500 focus:outline-none focus:border-primary/50 focus:bg-white/10 transition-all"
+                                    disabled={isProcessing}
+                                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-white focus:border-primary/50 focus:outline-none"
                                     value={formData.purpose}
                                     onChange={(e) => setFormData({ ...formData, purpose: e.target.value })}
                                 />
-                                <p className="text-xs text-gray-500">What are you saving for? This helps you stay motivated.</p>
                             </div>
 
                             {/* Amount */}
@@ -194,18 +318,38 @@ export default function CreatePersonalVault() {
                                         type="number"
                                         placeholder="0.00"
                                         required
-                                        step="0.0001"
-                                        min="0.0001"
-                                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 pr-20 text-white placeholder:text-gray-500 focus:outline-none focus:border-primary/50 focus:bg-white/10 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                        step="0.01"
+                                        min="0.1"
+                                        disabled={isProcessing}
+                                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 pr-20 text-white focus:border-primary/50 focus:outline-none"
                                         value={formData.amount}
                                         onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
                                     />
-                                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">C2FLR</span>
+                                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">USDT0</span>
                                 </div>
-                                {balance && (
-                                    <p className="text-xs text-gray-500">
-                                        Available: {parseFloat(formatEther(balance.value)).toFixed(4)} C2FLR
-                                    </p>
+                                {balance !== undefined && (
+                                    <div className="flex items-center gap-2">
+                                        <p className="text-xs text-gray-500">
+                                            Available: {formatUnits(balance, decimals || 18)} USDT0
+                                        </p>
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                writeContract({
+                                                    address: CONTRACTS.coston2.USDTToken,
+                                                    abi: ERC20_ABI,
+                                                    functionName: 'mint',
+                                                    args: [address!, parseUnits('1000', decimals || 18)]
+                                                }, {
+                                                    onSuccess: () => toast.success("Minted 1000 USDT0!")
+                                                });
+                                            }}
+                                            className="text-xs text-primary hover:underline"
+                                        >
+                                            (Mint 1000 Test Tokens)
+                                        </button>
+                                    </div>
                                 )}
                             </div>
 
@@ -231,81 +375,57 @@ export default function CreatePersonalVault() {
                                                 setFormData({ ...formData, duration: option.days });
                                                 setCustomDuration("");
                                             }}
-                                            className={`p-3 rounded-xl text-sm font-medium border-2 transition-all ${formData.duration === option.days
-                                                ? 'bg-primary/20 border-primary text-white shadow-lg shadow-primary/20'
-                                                : 'border-white/10 text-gray-400 hover:bg-white/5 hover:border-white/20'
-                                                }`}
+                                            disabled={isProcessing}
+                                            className={`p-3 rounded-xl text-sm font-medium border-2 transition-all ${formData.duration === option.days ? 'bg-primary/20 border-primary text-white' : 'border-white/10 text-gray-400'}`}
                                         >
                                             <div className="font-bold">{option.label}</div>
                                             <div className="text-xs opacity-70">{option.days} days</div>
                                         </button>
                                     ))}
                                 </div>
-
-                                {/* Custom Duration Input */}
+                                {/* Custom Duration */}
                                 <div className="mt-4">
-                                    <label className="text-xs text-gray-400 mb-2 block">Or enter custom duration (days):</label>
                                     <input
                                         type="number"
-                                        placeholder="e.g., 45, 120, 500"
-                                        min="1"
-                                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder:text-gray-500 focus:outline-none focus:border-primary/50 focus:bg-white/10 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                        placeholder="Custom days..."
+                                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white"
                                         value={customDuration}
+                                        disabled={isProcessing}
                                         onChange={(e) => {
                                             setCustomDuration(e.target.value);
                                             setFormData({ ...formData, duration: "" });
                                         }}
                                     />
                                 </div>
-
-                                <p className="text-xs text-gray-500">Funds will be locked until: <span className="text-white font-medium">{unlockDate.toLocaleDateString()}</span></p>
+                                <p className="text-xs text-gray-500">Unlocks on: {unlockDate.toLocaleDateString()}</p>
                             </div>
 
-                            {/* Fixed Penalty Display */}
-                            <div className="p-5 bg-gradient-to-br from-red-500/10 to-orange-500/10 border border-red-500/20 rounded-2xl">
-                                <div className="flex items-start gap-3 mb-4">
-                                    <div className="w-10 h-10 bg-red-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
-                                        <AlertTriangle className="w-5 h-5 text-red-400" />
+                            {/* Steps Progress, visual only if processing */}
+                            {isProcessing && (
+                                <div className="p-4 bg-primary/10 rounded-xl border border-primary/20 space-y-2">
+                                    <div className="flex items-center gap-2">
+                                        {currentStep === 'creating' ? <Loader2 className="w-4 h-4 animate-spin text-primary" /> : (currentStep !== 'idle' ? <Check className="w-4 h-4 text-green-500" /> : <div className="w-4 h-4 rounded-full border border-gray-500" />)}
+                                        <span className={`text-sm ${currentStep === 'creating' ? 'text-primary font-bold' : 'text-gray-400'}`}>1. Create Vault</span>
                                     </div>
-                                    <div className="flex-1">
-                                        <h4 className="font-semibold text-white mb-1">Early Withdrawal Penalty</h4>
-                                        <p className="text-sm text-gray-300">
-                                            Breaking your commitment early will incur a fixed penalty to ensure discipline.
-                                        </p>
+                                    <div className="flex items-center gap-2">
+                                        {currentStep === 'approving' ? <Loader2 className="w-4 h-4 animate-spin text-primary" /> : ((currentStep === 'depositing' || currentStep === 'generating_proof' || currentStep === 'done') ? <Check className="w-4 h-4 text-green-500" /> : <div className="w-4 h-4 rounded-full border border-gray-500" />)}
+                                        <span className={`text-sm ${currentStep === 'approving' ? 'text-primary font-bold' : 'text-gray-400'}`}>2. Approve USDT0</span>
                                     </div>
-                                </div>
-
-                                <div className="flex items-center justify-between p-4 bg-red-500/5 rounded-xl border border-red-500/10">
-                                    <span className="text-sm font-medium text-gray-300">Fixed Penalty Rate</span>
-                                    <span className="text-3xl font-bold text-red-400">{FIXED_PENALTY}%</span>
-                                </div>
-
-                                <p className="text-xs text-gray-400 mt-3 text-center">
-                                    ⚠️ This penalty applies if you withdraw before the unlock date
-                                </p>
-                            </div>
-
-                            {writeError && (
-                                <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
-                                    <p className="text-sm text-red-400">
-                                        {writeError.message?.includes("RPC")
-                                            ? "⚠️ Network issue - Please wait a moment and try again"
-                                            : `Error: ${writeError.message || "Failed to create vault"}`}
-                                    </p>
+                                    <div className="flex items-center gap-2">
+                                        {currentStep === 'depositing' ? <Loader2 className="w-4 h-4 animate-spin text-primary" /> : ((currentStep === 'generating_proof' || currentStep === 'done') ? <Check className="w-4 h-4 text-green-500" /> : <div className="w-4 h-4 rounded-full border border-gray-500" />)}
+                                        <span className={`text-sm ${currentStep === 'depositing' ? 'text-primary font-bold' : 'text-gray-400'}`}>3. Deposit USDT0</span>
+                                    </div>
                                 </div>
                             )}
 
                             <Button
                                 type="submit"
                                 size="lg"
-                                className="w-fit text-md flex mx-auto justify-center items-center mt-6 bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-700 text-white font-semibold shadow-lg shadow-primary/20"
-                                disabled={isPending || isConfirming || !isConnected || proofStatus === 'generating' || proofStatus === 'done'}
+                                className="w-full bg-primary hover:bg-primary/90 text-white font-semibold"
+                                disabled={isProcessing}
                             >
-                                {isPending ? "Confirm in Wallet..."
-                                    : isConfirming ? "Creating Vault..."
-                                        : proofStatus === 'generating' ? "Generating Proof (ProofRails)..."
-                                            : proofStatus === 'done' ? "Vault Created & Verified!"
-                                                : "Lock Funds & Create Vault"}
+                                {isProcessing ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                                {getButtonText()}
                             </Button>
                         </form>
                     </Card>
@@ -320,50 +440,18 @@ export default function CreatePersonalVault() {
                         </h3>
                         <div className="space-y-4">
                             <div>
-                                <p className="text-xs text-gray-500 mb-1">You're Locking</p>
-                                <p className="text-2xl font-bold text-white">{formData.amount || "0"} C2FLR</p>
+                                <p className="text-xs text-gray-500 mb-1">Locking Amount</p>
+                                <p className="text-2xl font-bold text-white">{formData.amount || "0"} USDT0</p>
                             </div>
                             <div className="h-px bg-white/10" />
-                            <div>
-                                <p className="text-xs text-gray-500 mb-1">Unlock Date</p>
-                                <p className="text-sm font-medium text-white">{unlockDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
-                            </div>
                             <div>
                                 <p className="text-xs text-gray-500 mb-1">Early Exit Penalty</p>
-                                <p className="text-sm font-medium text-red-400">{FIXED_PENALTY}% ({potentialPenalty} C2FLR)</p>
-                            </div>
-                            <div className="h-px bg-white/10" />
-                            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
-                                <p className="text-xs text-red-300">
-                                    ⚠️ <strong>Note:</strong> 10% penalty is fixed to ensure commitment discipline.
-                                </p>
+                                <p className="text-sm font-medium text-red-400">{FIXED_PENALTY}% ({potentialPenalty} USDT0)</p>
                             </div>
                         </div>
                     </Card>
-
-                    <Card className="p-6 bg-gradient-to-br from-green-500/5 to-emerald-500/5 border-green-500/20">
-                        <h4 className="text-sm font-semibold text-green-400 mb-2">✨ What Happens Next?</h4>
-                        <ul className="space-y-2 text-xs text-gray-300">
-                            <li className="flex items-start gap-2">
-                                <span className="text-green-400 mt-0.5">1.</span>
-                                <span>Vault contract deploys to blockchain</span>
-                            </li>
-                            <li className="flex items-start gap-2">
-                                <span className="text-green-400 mt-0.5">2.</span>
-                                <span>Your funds are locked until unlock date</span>
-                            </li>
-                            <li className="flex items-start gap-2">
-                                <span className="text-green-400 mt-0.5">3.</span>
-                                <span>Early withdrawal triggers penalty</span>
-                            </li>
-                            <li className="flex items-start gap-2">
-                                <span className="text-green-400 mt-0.5">4.</span>
-                                <span>After unlock: withdraw anytime, penalty-free</span>
-                            </li>
-                        </ul>
-                    </Card>
                 </div>
             </div>
-        </div >
+        </div>
     );
 }

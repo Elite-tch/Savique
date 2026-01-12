@@ -40,7 +40,7 @@ abstract contract AbstractVault is Ownable, ReentrancyGuard {
     /**
      * @dev Returns total Native balance of the vault
      */
-    function totalAssets() public view returns (uint256) {
+    function totalAssets() public view virtual returns (uint256) {
         return address(this).balance;
     }
     

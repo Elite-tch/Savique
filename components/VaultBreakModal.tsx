@@ -2,11 +2,13 @@
 
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, TrendingDown, X, Lock, Unlock } from "lucide-react";
-import { useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { useWriteContract, useWaitForTransactionReceipt, useAccount } from "wagmi";
 import { VAULT_ABI } from "@/lib/contracts";
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { useProofRails } from "@proofrails/sdk/react";
+import { saveReceipt } from "@/lib/receiptService";
 
 interface VaultBreakModalProps {
     isOpen: boolean;
@@ -35,15 +37,29 @@ export function VaultBreakModal({
     };
 
     const router = useRouter();
+    const { address: userAddress } = useAccount();
     const { writeContract, data: hash, isPending: isWritePending, error: writeError } = useWriteContract();
-    const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+    const { isLoading: isConfirming, isSuccess, data: receipt } = useWaitForTransactionReceipt({ hash });
+
+    // ProofRails Integration
+    const sdk = useProofRails();
+    const [isGeneratingProof, setIsGeneratingProof] = useState(false);
+
+    // Toast control
+    const toastId = useRef<string | number | null>(null);
 
     const handleWithdraw = () => {
-        writeContract({
-            address,
-            abi: VAULT_ABI,
-            functionName: "withdraw",
-        });
+        try {
+            toastId.current = toast.loading("Initializing Transaction...", toastStyle);
+            writeContract({
+                address,
+                abi: VAULT_ABI,
+                functionName: "withdraw",
+            });
+        } catch (error) {
+            console.error(error);
+            if (toastId.current) toast.dismiss(toastId.current);
+        }
     };
 
     // Calculate penalty
@@ -52,31 +68,70 @@ export function VaultBreakModal({
     const amountToReceive = Math.max(0, parseFloat(balance) - penaltyAmount);
 
     useEffect(() => {
-        if (isSuccess && hash) {
-            // Create "Breaked" History Record
-            const historyItem = {
-                id: `break_${hash}`,
-                txHash: hash,
-                timestamp: Date.now(),
-                purpose: purpose || "Vault Broken",
-                amount: amountToReceive.toFixed(2),
-                penalty: penaltyAmount.toFixed(2),
-                type: 'breaked',
-                verified: true
-            };
-            localStorage.setItem(`receipt_${hash}`, JSON.stringify(historyItem));
-
-            toast.success("Transaction Successful", toastStyle);
-            onClose();
-            router.push("/dashboard/vaults");
-        }
-        if (isWritePending) {
-            toast.loading("Initializing Transaction...", toastStyle);
-        }
         if (writeError) {
+            if (toastId.current) toast.dismiss(toastId.current);
             toast.error("Transaction Failed", toastStyle);
         }
-    }, [isSuccess, isWritePending, writeError, router, onClose, hash, amountToReceive, penaltyAmount, purpose]);
+    }, [writeError]);
+
+    useEffect(() => {
+        if (isSuccess && hash && receipt && !isGeneratingProof) {
+            if (toastId.current) toast.dismiss(toastId.current);
+            setIsGeneratingProof(true);
+
+            toast.success("Transaction Successful", toastStyle);
+
+            const generateReceipt = async () => {
+                try {
+                    // Generate ProofRails Receipt
+                    const receiptResult = await sdk.templates.payment({
+                        amount: amountToReceive,
+                        from: address, // Vault
+                        to: receipt.from, // User (initiator)
+                        purpose: `Vault Broken: ${purpose}`,
+                        transactionHash: receipt.transactionHash
+                    });
+
+                    // Save "Breaked" receipt to Firestore
+                    await saveReceipt({
+                        walletAddress: userAddress!.toLowerCase(),
+                        txHash: receipt.transactionHash,
+                        timestamp: Date.now(),
+                        purpose: purpose || "Vault Broken",
+                        amount: amountToReceive.toFixed(2),
+                        penalty: penaltyAmount.toFixed(2),
+                        type: 'breaked',
+                        verified: !!receiptResult?.id,
+                        proofRailsId: receiptResult?.id
+                    });
+
+                    toast.success("Receipt Generated", toastStyle);
+                    onClose();
+                    router.push("/dashboard/vaults");
+                } catch (error) {
+                    console.error("Failed to generate receipt:", error);
+                    toast.error("Receipt Generation Failed", toastStyle);
+
+                    // Fallback: save to Firestore even on error
+                    await saveReceipt({
+                        walletAddress: userAddress!.toLowerCase(),
+                        txHash: receipt.transactionHash,
+                        timestamp: Date.now(),
+                        purpose: purpose || "Vault Broken",
+                        amount: amountToReceive.toFixed(2),
+                        penalty: penaltyAmount.toFixed(2),
+                        type: 'breaked',
+                        verified: false
+                    });
+
+                    onClose();
+                    router.push("/dashboard/vaults");
+                }
+            };
+
+            generateReceipt();
+        }
+    }, [isSuccess, router, onClose, hash, receipt, amountToReceive, penaltyAmount, purpose, sdk, isGeneratingProof]);
 
 
     if (!isOpen) return null;
@@ -106,16 +161,16 @@ export function VaultBreakModal({
                     <div className="bg-red-950/20 border border-red-500/20 rounded-xl p-5 space-y-4">
                         <div className="flex justify-between items-center text-sm">
                             <span className="text-zinc-400">Locked Balance</span>
-                            <span className="font-mono text-white">{parseFloat(balance).toFixed(2)} C2FLR</span>
+                            <span className="font-mono text-white">{parseFloat(balance).toFixed(2)} USDT0</span>
                         </div>
                         <div className="flex justify-between items-center text-sm text-red-400">
                             <span className="flex items-center gap-1"><TrendingDown className="w-4 h-4" /> Penalty ({penaltyPercent}%)</span>
-                            <span className="font-mono font-bold">-{penaltyAmount.toFixed(2)} C2FLR</span>
+                            <span className="font-mono font-bold">-{penaltyAmount.toFixed(2)} USDT0</span>
                         </div>
                         <div className="h-px bg-red-500/20 w-full" />
                         <div className="flex justify-between items-center">
                             <span className="text-white font-medium">You Recover</span>
-                            <span className="font-mono font-bold text-xl text-white">{amountToReceive.toFixed(2)} C2FLR</span>
+                            <span className="font-mono font-bold text-xl text-white">{amountToReceive.toFixed(2)} USDT0</span>
                         </div>
                     </div>
                     <p className="text-xs text-center text-zinc-500 px-4">

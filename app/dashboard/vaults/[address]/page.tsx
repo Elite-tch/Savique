@@ -1,17 +1,19 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { useReadContract, useWriteContract, useWaitForTransactionReceipt, useAccount } from "wagmi";
 import { VAULT_ABI } from "@/lib/contracts";
-import { formatEther } from "viem";
+import { formatUnits } from "viem";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Lock, Unlock, ArrowLeft, Clock, Wallet, AlertTriangle, ShieldCheck } from "lucide-react";
+import { Lock, Unlock, ArrowLeft, Clock, Wallet, AlertTriangle, ShieldCheck, Eye, EyeOff } from "lucide-react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { VaultBreakModal } from "@/components/VaultBreakModal";
+import { useProofRails } from "@proofrails/sdk/react";
+import { saveReceipt } from "@/lib/receiptService";
 
 const MOTIVATION_QUOTES = [
     "Discipline is doing what needs to be done, even if you don't want to do it.",
@@ -60,6 +62,15 @@ export default function VaultDetailPage() {
 
     const [quote, setQuote] = useState("");
     const [isBreakModalOpen, setIsBreakModalOpen] = useState(false);
+    const [isBalanceVisible, setIsBalanceVisible] = useState(false);
+    const { address: userAddress } = useAccount();
+
+    // Add toast ref
+    const toastId = useRef<string | number | null>(null);
+
+    // ProofRails Integration
+    const sdk = useProofRails();
+    const [isGeneratingProof, setIsGeneratingProof] = useState(false);
 
     // Brand Styled Toast
     const toastStyle = {
@@ -77,10 +88,10 @@ export default function VaultDetailPage() {
     const { data: unlockTimeResult } = useReadContract({ address, abi: VAULT_ABI, functionName: "unlockTimestamp" });
 
     // Withdrawal for unlocked vault
-    const { writeContract, data: hash, isPending: isWithdrawPending } = useWriteContract();
-    const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+    const { writeContract, data: hash, isPending: isWithdrawPending, error: writeError } = useWriteContract();
+    const { isLoading: isConfirming, isSuccess, data: receipt } = useWaitForTransactionReceipt({ hash });
 
-    const balance = balanceResult ? formatEther(balanceResult) : "0";
+    const balance = balanceResult ? formatUnits(balanceResult, 18) : "0";
     const unlockDate = unlockTimeResult ? new Date(Number(unlockTimeResult) * 1000) : new Date();
     const isLocked = new Date() < unlockDate;
     const countdown = useCountdown(unlockDate);
@@ -90,32 +101,79 @@ export default function VaultDetailPage() {
         setQuote(MOTIVATION_QUOTES[Math.floor(Math.random() * MOTIVATION_QUOTES.length)]);
     }, []);
 
+    // Handle Write Error
     useEffect(() => {
-        if (isSuccess && hash) {
-            // Create "Completed" History Record
-            const historyItem = {
-                id: `completed_${hash}`,
-                txHash: hash,
-                timestamp: Date.now(),
-                purpose: purpose || "Vault Withdrawal",
-                amount: parseFloat(balance).toFixed(2),
-                type: 'completed',
-                verified: true
-            };
-            localStorage.setItem(`receipt_${hash}`, JSON.stringify(historyItem));
+        if (writeError) {
+            if (toastId.current) toast.dismiss(toastId.current);
+            toast.error(`Transaction Failed: ${writeError.message.split('\n')[0]}`, toastStyle);
+        }
+    }, [writeError]);
+
+    useEffect(() => {
+        if (isSuccess && hash && receipt && !isGeneratingProof) {
+            if (toastId.current) toast.dismiss(toastId.current);
+            setIsGeneratingProof(true);
 
             toast.success("Transaction Successful", toastStyle);
-            router.push("/dashboard/vaults");
+
+            const generateReceipt = async () => {
+                try {
+                    // Generate ProofRails Receipt
+                    const receiptResult = await sdk.templates.payment({
+                        amount: parseFloat(balance),
+                        from: address, // Vault
+                        to: receipt.from, // User
+                        purpose: `Vault Withdrawal: ${purpose}`,
+                        transactionHash: receipt.transactionHash
+                    });
+
+                    // Save "Completed" receipt to Firestore
+                    await saveReceipt({
+                        walletAddress: userAddress!.toLowerCase(),
+                        txHash: receipt.transactionHash,
+                        timestamp: Date.now(),
+                        purpose: purpose || "Vault Withdrawal",
+                        amount: parseFloat(balance).toFixed(2),
+                        type: 'completed',
+                        verified: !!receiptResult?.id,
+                        proofRailsId: receiptResult?.id
+                    });
+
+                    toast.success("Receipt Generated", toastStyle);
+                    router.push("/dashboard/vaults");
+                } catch (error) {
+                    console.error("Failed to generate receipt:", error);
+                    toast.error("Receipt Generation Failed", toastStyle);
+
+                    // Fallback: save to Firestore even on error
+                    await saveReceipt({
+                        walletAddress: userAddress!.toLowerCase(),
+                        txHash: receipt.transactionHash,
+                        timestamp: Date.now(),
+                        purpose: purpose || "Vault Withdrawal",
+                        amount: parseFloat(balance).toFixed(2),
+                        type: 'completed',
+                        verified: false
+                    });
+                    router.push("/dashboard/vaults");
+                }
+            };
+            generateReceipt();
         }
-    }, [isSuccess, router, hash, purpose, balance]);
+    }, [isSuccess, router, hash, purpose, balance, receipt, sdk, isGeneratingProof]);
 
     const handleWithdrawUnlocked = () => {
-        toast.loading("Initializing Transaction...", toastStyle);
-        writeContract({
-            address,
-            abi: VAULT_ABI,
-            functionName: "withdraw",
-        });
+        try {
+            toastId.current = toast.loading("Initializing Transaction...", toastStyle);
+            writeContract({
+                address,
+                abi: VAULT_ABI,
+                functionName: "withdraw",
+            });
+        } catch (error) {
+            console.error(error);
+            if (toastId.current) toast.dismiss(toastId.current);
+        }
     };
 
     if (!address) return <div>Invalid Vault Address</div>;
@@ -137,6 +195,7 @@ export default function VaultDetailPage() {
                         </span>
                     </h1>
                 </div>
+
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -185,10 +244,15 @@ export default function VaultDetailPage() {
                             <div>
                                 <p className="text-sm text-zinc-500 mb-1">Total Balance</p>
                                 <h3 className="text-2xl font-bold text-white flex items-baseline gap-1">
-                                    {parseFloat(balance).toFixed(2)} <span className="text-sm font-normal text-zinc-500">C2FLR</span>
+                                    {isBalanceVisible ? parseFloat(balance).toFixed(2) : "••••••"} <span className="text-sm font-normal text-zinc-500">USDT0</span>
                                 </h3>
                             </div>
-
+                            <button
+                                onClick={() => setIsBalanceVisible(!isBalanceVisible)}
+                                className="text-zinc-500 hover:text-white transition-colors"
+                            >
+                                {isBalanceVisible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                            </button>
                         </div>
                         <div className="flex items-center gap-2 text-xs text-zinc-500 pt-4 border-t border-zinc-800/50">
                             <ShieldCheck className="w-3 h-3 text-primary" />

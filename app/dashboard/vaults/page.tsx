@@ -3,13 +3,14 @@
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Lock, Search, Wallet, Clock, AlertTriangle, Calendar } from "lucide-react";
+import { Plus, Lock, Search, Wallet, Clock, AlertTriangle, Calendar, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { Input } from "@/components/ui/input";
 import { useAccount, useReadContract } from "wagmi";
 import { CONTRACTS, VAULT_FACTORY_ABI, VAULT_ABI } from "@/lib/contracts";
-import { formatEther } from "viem";
+import { formatUnits } from "viem";
 import { motion } from "framer-motion";
+import { getReceiptsByWallet, Receipt } from "@/lib/receiptService";
 
 function useCountdown(targetDate: Date) {
     const [timeLeft, setTimeLeft] = useState({
@@ -49,6 +50,7 @@ function useCountdown(targetDate: Date) {
     return timeLeft;
 }
 
+
 function VaultCard({ address }: { address: `0x${string}` }) {
     const { data: purpose } = useReadContract({
         address,
@@ -68,14 +70,40 @@ function VaultCard({ address }: { address: `0x${string}` }) {
         functionName: "unlockTimestamp",
     });
 
-    const balance = balanceResult ? formatEther(balanceResult) : "0";
+    const [isVisible, setIsVisible] = useState(false);
+    const [creationDate, setCreationDate] = useState<Date | null>(null);
+    const { address: userAddress } = useAccount();
+
+    const balance = balanceResult ? formatUnits(balanceResult, 18) : "0";
     const unlockDate = unlockTimeResult ? new Date(Number(unlockTimeResult) * 1000) : new Date();
     const isLocked = new Date() < unlockDate;
 
     const countdown = useCountdown(unlockDate);
 
-    // Estimate creation time
-    const estimatedCreation = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    // Fetch actual creation date from Firestore
+    useEffect(() => {
+        const fetchCreationDate = async () => {
+            if (!userAddress) return;
+
+            try {
+                const receipts = await getReceiptsByWallet(userAddress);
+                // Find the creation receipt for this vault by matching purpose
+                const creationReceipt = receipts.find(
+                    r => r.type === 'created' && r.purpose === purpose
+                );
+
+                if (creationReceipt) {
+                    setCreationDate(new Date(creationReceipt.timestamp));
+                }
+            } catch (error) {
+                console.error('[VaultCard] Error fetching creation date:', error);
+            }
+        };
+
+        if (purpose) {
+            fetchCreationDate();
+        }
+    }, [userAddress, purpose]);
 
     if (parseFloat(balance) <= 0) return null;
 
@@ -108,7 +136,7 @@ function VaultCard({ address }: { address: `0x${string}` }) {
                             {/* Creation Time */}
                             <div className="flex items-center gap-2 text-gray-400 text-xs mb-2">
                                 <Calendar className="w-3 h-3" />
-                                <span>Created: {estimatedCreation.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                                <span>Created: {creationDate ? creationDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Loading...'}</span>
                             </div>
 
                             {/* Countdown Timer */}
@@ -134,9 +162,15 @@ function VaultCard({ address }: { address: `0x${string}` }) {
                                 <div>
                                     <p className="text-xs text-gray-500 mb-1">Total Savings</p>
                                     <div className="text-lg font-bold text-white flex items-center gap-1">
-                                        {parseFloat(balance).toFixed(2)} <span className="text-xs font-normal text-gray-500">C2FLR</span>
+                                        {isVisible ? parseFloat(balance).toFixed(2) : "••••••"} <span className="text-xs font-normal text-gray-500">USDT0</span>
                                     </div>
                                 </div>
+                                <button
+                                    onClick={(e) => { e.preventDefault(); setIsVisible(!isVisible); }}
+                                    className="p-1 hover:bg-white/10 rounded-full text-gray-500 hover:text-white transition-colors"
+                                >
+                                    {isVisible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                                </button>
                             </div>
                         </div>
                     </div>

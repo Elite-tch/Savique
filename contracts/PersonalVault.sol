@@ -2,13 +2,17 @@
 pragma solidity ^0.8.20;
 
 import "./AbstractVault.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title PersonalVault
- * @dev Native C2FLR Savings Vault.
+ * @dev ERC-20 Token (USDT) Savings Vault with time-lock and early withdrawal penalty.
  */
 contract PersonalVault is AbstractVault {
+    using SafeERC20 for IERC20;
 
+    IERC20 public immutable token; // The ERC-20 token (USDT)
     uint256 public unlockTimestamp;
     uint256 public penaltyBps; // Basis points (e.g. 500 = 5%)
     address public treasury; // Address to receive penalties
@@ -17,37 +21,47 @@ contract PersonalVault is AbstractVault {
     event FullWithdrawal(address indexed user, uint256 amount);
 
     constructor(
-        // No _token arg needed
+        address _token,
         string memory _purpose,
         address _owner,
         uint256 _unlockTimestamp,
         uint256 _penaltyBps,
         address _treasury
-    ) payable AbstractVault(_purpose, _owner) {
+    ) AbstractVault(_purpose, _owner) {
+        require(_token != address(0), "Invalid token address");
         require(_unlockTimestamp > block.timestamp, "Unlock time must be in future");
         require(_penaltyBps <= 10000, "Invalid basis points");
         
+        token = IERC20(_token);
         unlockTimestamp = _unlockTimestamp;
         penaltyBps = _penaltyBps;
         treasury = _treasury;
-
-        // Handle initial deposit
-        if (msg.value > 0) {
-            emit Deposited(_owner, msg.value, block.timestamp);
-            _onDeposit(_owner, msg.value);
-        }
     }
 
     /**
-     * @dev Withdraws entire Native balance. 
+     * @dev Deposit ERC-20 tokens into the vault
+     * @param amount Amount of tokens to deposit
+     */
+    function deposit(uint256 amount) external onlyOwner nonReentrant {
+        require(amount > 0, "Amount must be greater than 0");
+        
+        // Transfer tokens from user to vault
+        token.safeTransferFrom(msg.sender, address(this), amount);
+        
+        emit Deposited(msg.sender, amount, block.timestamp);
+        _onDeposit(msg.sender, amount);
+    }
+
+    /**
+     * @dev Withdraws entire token balance
      */
     function withdraw() external onlyOwner nonReentrant {
-        uint256 balance = address(this).balance;
+        uint256 balance = token.balanceOf(address(this));
         require(balance > 0, "No funds to withdraw");
 
         if (block.timestamp >= unlockTimestamp) {
             // Success Case: Full withdrawal
-            _sendNative(msg.sender, balance);
+            token.safeTransfer(msg.sender, balance);
             
             emit Withdrawn(msg.sender, balance, block.timestamp, "MATURITY");
             emit FullWithdrawal(msg.sender, balance);
@@ -57,10 +71,10 @@ contract PersonalVault is AbstractVault {
             uint256 remaining = balance - penalty;
 
             if (penalty > 0) {
-                _sendNative(treasury, penalty);
+                token.safeTransfer(treasury, penalty);
             }
             if (remaining > 0) {
-                _sendNative(msg.sender, remaining);
+                token.safeTransfer(msg.sender, remaining);
             }
 
             emit Withdrawn(msg.sender, remaining, block.timestamp, "EARLY_EXIT");
@@ -68,8 +82,10 @@ contract PersonalVault is AbstractVault {
         }
     }
 
-    function _sendNative(address to, uint256 amount) internal {
-        (bool success, ) = payable(to).call{value: amount}("");
-        require(success, "Native transfer failed");
+    /**
+     * @dev Returns the total assets (token balance) in the vault
+     */
+    function totalAssets() public view override returns (uint256) {
+        return token.balanceOf(address(this));
     }
 }
