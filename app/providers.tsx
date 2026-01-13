@@ -7,6 +7,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { http } from "viem";
 import { ProofRailsProvider } from "@proofrails/sdk/react";
 import { Toaster } from "sonner";
+import { AutoDisconnect } from "@/components/AutoDisconnect";
 
 export const flare = defineChain({
     id: 14,
@@ -35,8 +36,9 @@ export const flareCoston2 = defineChain({
     rpcUrls: {
         default: {
             http: [
-                "https://coston2-api.flare.network/ext/C/rpc",
-                "https://rpc.ankr.com/flare_coston2"
+                "https://flare-testnet-coston2.rpc.thirdweb.com",
+                "https://coston2.enosys.global/ext/C/rpc",
+                "https://coston2-api.flare.network/ext/C/rpc"
             ]
         },
     },
@@ -73,12 +75,13 @@ export default function Providers({ children }: { children: React.ReactNode }) {
                 appearance: {
                     theme: "dark",
                     accentColor: "#E62058", // Flare Pink
-                    logo: "https://flare.network/wp-content/uploads/2022/09/Flare_Logo_White.svg",
+                    logo: "/logo.png",
                 },
             }}
         >
             <QueryClientProvider client={queryClient}>
                 <WagmiProvider config={wagmiConfig}>
+                    <AutoDisconnect />
                     <ProofRailsProvider apiKey={process.env.NEXT_PUBLIC_PROOFRAILS_KEY || ""}>
                         {children}
                         <Toaster position="top-right" theme="dark" richColors closeButton />

@@ -3,50 +3,44 @@
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Receipt, ExternalLink, CheckCircle, History, Calendar, Clock, AlertTriangle, Lock } from "lucide-react";
+import { Receipt as ReceiptIcon, ExternalLink, CheckCircle, Calendar, Clock } from "lucide-react";
 import { motion } from "framer-motion";
-
-interface ReceiptData {
-    id: string;
-    txHash: string;
-    timestamp: number;
-    purpose: string;
-    amount: string;
-    verified?: boolean;
-    type?: 'created' | 'breaked' | 'completed';
-    penalty?: string;
-}
+import { useAccount } from "wagmi";
+import { getReceiptsByWallet, Receipt } from "@/lib/receiptService";
 
 export default function HistoryPage() {
-    const [receipts, setReceipts] = useState<ReceiptData[]>([]);
+    const { address: currentAddress } = useAccount();
+    const [receipts, setReceipts] = useState<Receipt[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        // Load all receipts from localStorage
-        const loadReceipts = () => {
-            const allReceipts: ReceiptData[] = [];
-            for (let i = 0; i < localStorage.length; i++) {
-                const key = localStorage.key(i);
-                if (key?.startsWith('receipt_')) {
-                    const data = localStorage.getItem(key);
-                    if (data) {
-                        try {
-                            const parsed = JSON.parse(data);
-                            // Backwards compatibility
-                            if (!parsed.type) parsed.type = 'created';
-                            allReceipts.push(parsed);
-                        } catch (e) {
-                            console.error("Failed to parse receipt:", e);
-                        }
-                    }
-                }
+        const loadReceipts = async () => {
+            if (!currentAddress) {
+                console.log("[History] No current address, clearing receipts");
+                setReceipts([]);
+                setIsLoading(false);
+                return;
             }
-            // Sort by timestamp (newest first)
-            allReceipts.sort((a, b) => b.timestamp - a.timestamp);
-            setReceipts(allReceipts);
+
+            try {
+                setIsLoading(true);
+                console.log("[History] Loading receipts from Firestore for:", currentAddress);
+
+                const fetchedReceipts = await getReceiptsByWallet(currentAddress);
+                setReceipts(fetchedReceipts);
+
+                console.log("[History] Loaded receipts:", fetchedReceipts.length);
+            } catch (error) {
+                console.error("[History] Error loading receipts:", error);
+                // Silently fail - user will see empty state
+                setReceipts([]);
+            } finally {
+                setIsLoading(false);
+            }
         };
 
         loadReceipts();
-    }, []);
+    }, [currentAddress]);
 
     const viewOnExplorer = (txHash: string) => {
         window.open(`https://coston2-explorer.flare.network/tx/${txHash}`, '_blank');
@@ -59,10 +53,16 @@ export default function HistoryPage() {
                 <p className="text-gray-400">View your ProofRails verified transaction receipts</p>
             </div>
 
-            {receipts.length === 0 ? (
+            {isLoading ? (
+                <div className="grid grid-cols-1 gap-4">
+                    {[1, 2, 3].map((i) => (
+                        <Card key={i} className="h-32 animate-pulse bg-white/5 border-transparent" />
+                    ))}
+                </div>
+            ) : receipts.length === 0 ? (
                 <Card className="border-dashed border-white/10 bg-transparent flex flex-col items-center justify-center p-12 text-center min-h-[400px]">
                     <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mb-6">
-                        <Receipt className="w-10 h-10 text-gray-500" />
+                        <ReceiptIcon className="w-10 h-10 text-gray-500" />
                     </div>
                     <h3 className="text-xl font-medium text-white mb-2">No Receipts Yet</h3>
                     <p className="text-gray-400 max-w-sm mx-auto">
@@ -102,7 +102,7 @@ export default function HistoryPage() {
                                                     <span>{new Date(receipt.timestamp).toLocaleString()}</span>
                                                 </div>
                                                 <div className="flex items-center gap-2 text-sm text-gray-400">
-                                                    <Receipt className="w-3 h-3" />
+                                                    <ReceiptIcon className="w-3 h-3" />
                                                     <span className="font-mono text-xs">
                                                         TX: {receipt.txHash.slice(0, 10)}...{receipt.txHash.slice(-8)}
                                                     </span>
@@ -114,7 +114,7 @@ export default function HistoryPage() {
                                     <div className="flex flex-col md:items-end gap-3">
                                         <div className="text-right">
                                             <p className="text-xs text-gray-500 mb-1">Amount</p>
-                                            <p className="text-lg font-bold text-white">{receipt.amount} C2FLR</p>
+                                            <p className="text-lg font-bold text-white">{receipt.amount} USDT0</p>
                                             {receipt.penalty && (
                                                 <p className="text-xs text-red-500 font-medium mt-1">
                                                     -{receipt.penalty} Penalty
@@ -132,11 +132,11 @@ export default function HistoryPage() {
                                                 Explorer
                                             </Button>
 
-                                            {receipt.verified ? (
+                                            {receipt.verified && receipt.proofRailsId ? (
                                                 <div className="px-3 py-2 bg-green-500/10 border border-green-500/20 rounded-md flex items-center gap-2">
                                                     <CheckCircle className="w-3 h-3 text-green-500" />
                                                     <button
-                                                        onClick={() => window.open(`https://proofrails-clone-middleware.onrender.com/receipt/${receipt.id}`, '_blank')}
+                                                        onClick={() => window.open(`https://proofrails-clone-middleware.onrender.com/receipt/${receipt.proofRailsId}`, '_blank')}
                                                         className="text-xs cursor-pointer text-green-400 font-medium bg-transparent hover:underline">ProofRails Verified </button>
                                                 </div>
                                             ) : (

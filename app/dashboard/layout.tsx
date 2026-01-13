@@ -48,10 +48,10 @@ function MotivationalHeader() {
 }
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-    const { logout, login, user, authenticated } = usePrivy();
+    const { logout, login, user, authenticated, ready } = usePrivy();
     const pathname = usePathname();
 
-    const walletAddress = user?.wallet?.address;
+    const walletAddress = authenticated && user?.wallet?.address ? user.wallet.address : null;
     const shortAddress = walletAddress ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : "";
 
     return (
@@ -120,7 +120,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     </div>
 
                     <div className="flex items-center gap-4">
-                        {authenticated ? (
+                        {ready && authenticated && walletAddress ? (
                             <>
                                 <div className="flex items-center gap-3 px-4 py-2 bg-white/5 rounded-full border border-white/5">
                                     <span className="text-sm font-medium text-gray-200">{shortAddress}</span>

@@ -28,7 +28,7 @@ export default function LandingPage() {
 
                     <Link href="/dashboard">
                         <Button size="sm"
-                        className="rounded-full">
+                            className="rounded-full">
                             Launch App
                         </Button>
                     </Link>
@@ -79,7 +79,7 @@ export default function LandingPage() {
                             </div>
                             <h3 className="text-xl font-bold text-white mb-3">Personal Goals</h3>
                             <p className="text-gray-400">
-                                Lock your USDT for a set time. Early withdrawals incur penalties,
+                                Lock your USDT0 for a set time. Early withdrawals incur penalties,
                                 forcing you to stick to your commitments.
                             </p>
                         </motion.div>

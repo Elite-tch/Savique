@@ -5,7 +5,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { useReadContract } from "wagmi";
 import { VAULT_ABI } from "@/lib/contracts";
-import { formatEther } from "viem";
+import { formatUnits } from "viem";
 
 export function VaultPreviewCard({ address, index }: { address: `0x${string}`; index: number }) {
     const { data: purpose } = useReadContract({
@@ -26,7 +26,7 @@ export function VaultPreviewCard({ address, index }: { address: `0x${string}`; i
         functionName: "unlockTimestamp",
     });
 
-    const balance = balanceResult ? formatEther(balanceResult) : "0";
+    const balance = balanceResult ? formatUnits(balanceResult, 18) : "0";
     const unlockDate = unlockTimeResult ? new Date(Number(unlockTimeResult) * 1000) : new Date();
     const isLocked = new Date() < unlockDate;
 

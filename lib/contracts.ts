@@ -1,7 +1,8 @@
 // -------------------- Config --------------------
 export const CONTRACTS = {
     coston2: {
-        VaultFactory: "0x81149a0E0eB69285362bAB5085a4CB852F2A3e07" as `0x${string}`,
+        VaultFactory: "0x08f94e424028e8dcae5d62ed879774b8e7ade30d" as `0x${string}`,
+        USDTToken: "0xCD92F943B0e809730E1882e35beAbD5e102bec52" as `0x${string}`,
     },
 } as const;
 
@@ -14,7 +15,14 @@ export const VAULT_FACTORY_ABI = [
         ],
         name: "createPersonalVault",
         outputs: [{ name: "", type: "address" }],
-        stateMutability: "payable",
+        stateMutability: "nonpayable",
+        type: "function"
+    },
+    {
+        inputs: [],
+        name: "usdtToken",
+        outputs: [{ name: "", type: "address" }],
+        stateMutability: "view",
         type: "function"
     },
     {
@@ -50,14 +58,68 @@ export const VAULT_ABI = [
     },
     {
         inputs: [],
+        name: "token",
+        outputs: [{ name: "", type: "address" }],
+        stateMutability: "view",
+        type: "function"
+    },
+    {
+        inputs: [{ name: "amount", type: "uint256" }],
         name: "deposit",
         outputs: [],
-        stateMutability: "payable",
+        stateMutability: "nonpayable",
         type: "function"
     },
     {
         inputs: [],
         name: "withdraw",
+        outputs: [],
+        stateMutability: "nonpayable",
+        type: "function"
+    }
+] as const;
+
+export const ERC20_ABI = [
+    {
+        inputs: [
+            { name: "spender", type: "address" },
+            { name: "amount", type: "uint256" }
+        ],
+        name: "approve",
+        outputs: [{ name: "", type: "bool" }],
+        stateMutability: "nonpayable",
+        type: "function"
+    },
+    {
+        inputs: [
+            { name: "owner", type: "address" },
+            { name: "spender", type: "address" }
+        ],
+        name: "allowance",
+        outputs: [{ name: "", type: "uint256" }],
+        stateMutability: "view",
+        type: "function"
+    },
+    {
+        inputs: [{ name: "account", type: "address" }],
+        name: "balanceOf",
+        outputs: [{ name: "", type: "uint256" }],
+        stateMutability: "view",
+        type: "function"
+    },
+    {
+        inputs: [],
+        name: "decimals",
+        outputs: [{ name: "", type: "uint8" }],
+        stateMutability: "view",
+        type: "function"
+    },
+    {
+        inputs: [
+            { name: "to", type: "address" },
+            { name: "amount", type: "uint256" }
+        ],
+        name: "mint",
         outputs: [],
         stateMutability: "nonpayable",
         type: "function"
