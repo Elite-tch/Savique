@@ -56,7 +56,9 @@ export default function HistoryPage() {
             {isLoading ? (
                 <div className="grid grid-cols-1 gap-4">
                     {[1, 2, 3].map((i) => (
-                        <Card key={i} className="h-32 animate-pulse bg-white/5 border-transparent" />
+                        <Card key={i} className="h-32 animate-pulse bg-white/5 border-transparent">
+                            <div className="w-full h-full" />
+                        </Card>
                     ))}
                 </div>
             ) : receipts.length === 0 ? (
