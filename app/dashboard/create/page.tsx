@@ -404,15 +404,15 @@ export default function CreatePersonalVault() {
                             {isProcessing && (
                                 <div className="p-4 bg-primary/10 rounded-xl border border-primary/20 space-y-2">
                                     <div className="flex items-center gap-2">
-                                        {currentStep === 'creating' ? <Loader2 className="w-4 h-4 animate-spin text-primary" /> : (currentStep !== 'idle' ? <Check className="w-4 h-4 text-green-500" /> : <div className="w-4 h-4 rounded-full border border-gray-500" />)}
+                                        {currentStep === 'creating' ? <Loader2 className="w-4 h-4 animate-spin text-primary" /> : <Check className="w-4 h-4 text-green-500" />}
                                         <span className={`text-sm ${currentStep === 'creating' ? 'text-primary font-bold' : 'text-gray-400'}`}>1. Create Vault</span>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        {currentStep === 'approving' ? <Loader2 className="w-4 h-4 animate-spin text-primary" /> : ((currentStep === 'depositing' || currentStep === 'generating_proof' || currentStep === 'done') ? <Check className="w-4 h-4 text-green-500" /> : <div className="w-4 h-4 rounded-full border border-gray-500" />)}
+                                        {currentStep === 'approving' ? <Loader2 className="w-4 h-4 animate-spin text-primary" /> : ((currentStep === 'depositing' || currentStep === 'generating_proof') ? <Check className="w-4 h-4 text-green-500" /> : <div className="w-4 h-4 rounded-full border border-gray-500" />)}
                                         <span className={`text-sm ${currentStep === 'approving' ? 'text-primary font-bold' : 'text-gray-400'}`}>2. Approve USDT0</span>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        {currentStep === 'depositing' ? <Loader2 className="w-4 h-4 animate-spin text-primary" /> : ((currentStep === 'generating_proof' || currentStep === 'done') ? <Check className="w-4 h-4 text-green-500" /> : <div className="w-4 h-4 rounded-full border border-gray-500" />)}
+                                        {currentStep === 'depositing' ? <Loader2 className="w-4 h-4 animate-spin text-primary" /> : (currentStep === 'generating_proof' ? <Check className="w-4 h-4 text-green-500" /> : <div className="w-4 h-4 rounded-full border border-gray-500" />)}
                                         <span className={`text-sm ${currentStep === 'depositing' ? 'text-primary font-bold' : 'text-gray-400'}`}>3. Deposit USDT0</span>
                                     </div>
                                 </div>
