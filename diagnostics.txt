@@ -1,3 +1,0 @@
-Factory Error: invalid address (argument="address", value="0xf5c64d5a6aee90646a85cf3d01225e52afeda40eb", code=INVALID_ARGUMENT, version=6.16.0)
-USDT Checksum: 0xCD92F943B0e809730E1882e35beAbD5e102bec52
-Chain Query Error: other side closed
