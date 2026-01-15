@@ -43,7 +43,7 @@ export default function LandingPage() {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.5 }}
                     >
-                        <h1 className="text-5xl md:text-7xl font-bold mb-6 tracking-tight text-white">
+                        <h1 className="text-4xl md:text-7xl font-bold mb-6 tracking-tight text-white">
                             Purpose Aware <br />
                             <span className="text-primary glow">Savings & Commitment</span>
                         </h1>

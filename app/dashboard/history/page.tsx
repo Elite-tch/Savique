@@ -114,7 +114,7 @@ export default function HistoryPage() {
                                     </div>
 
                                     <div className="flex flex-col md:items-end gap-3">
-                                        <div className="text-right">
+                                        <div className="text-left md:text-right">
                                             <p className="text-xs text-gray-500 mb-1">Amount</p>
                                             <p className="text-lg font-bold text-white">{receipt.amount} USDT0</p>
                                             {receipt.penalty && (

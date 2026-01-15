@@ -2,7 +2,7 @@
 export const CONTRACTS = {
     coston2: {
         VaultFactory: "0x08f94e424028e8dcae5d62ed879774b8e7ade30d" as `0x${string}`,
-        USDTToken: "0xCD92F943B0e809730E1882e35beAbD5e102bec52" as `0x${string}`,
+        USDTToken: "0xC1A5B41512496B80903D1f32d6dEa3a73212E71F" as `0x${string}`,
     },
 } as const;
 

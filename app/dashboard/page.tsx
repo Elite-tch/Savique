@@ -58,8 +58,11 @@ export default function Dashboard() {
         abi: ERC20_ABI,
         functionName: 'balanceOf',
         args: [address as `0x${string}`],
-        query: { enabled: !!address && isLoaded },
+        query: {
+            enabled: !!address && isLoaded,
+        }
     });
+
 
     const { data: decimals } = useReadContract({
         address: usdtAddress,
@@ -77,7 +80,9 @@ export default function Dashboard() {
         abi: VAULT_FACTORY_ABI,
         functionName: "getUserVaults",
         args: address ? [address] : undefined,
-        query: { enabled: !!address && isConnected && isLoaded }
+        query: {
+            enabled: !!address && isConnected && isLoaded
+        }
     });
 
     const vaultCount = vaultAddresses?.length || 0;
@@ -91,7 +96,9 @@ export default function Dashboard() {
 
     const { data: vaultBalances, isLoading: isBalancesLoading } = useReadContracts({
         contracts: vaultBalanceContracts,
-        query: { enabled: vaultCount > 0 }
+        query: {
+            enabled: vaultCount > 0
+        }
     });
 
     // Read unlock timestamps from all vaults
@@ -103,7 +110,9 @@ export default function Dashboard() {
 
     const { data: unlockTimestamps } = useReadContracts({
         contracts: vaultUnlockContracts,
-        query: { enabled: vaultCount > 0 }
+        query: {
+            enabled: vaultCount > 0
+        }
     });
 
     // Calculate completed vaults (unlocked)
@@ -239,7 +248,7 @@ export default function Dashboard() {
             </div>
 
             {/* Action Row */}
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between md:flex-row flex-col gap-3 md:items-center">
                 <h2 className="text-2xl font-bold text-white">Recent Vaults</h2>
                 <div className="flex gap-4 items-center">
                     <Link href="/dashboard/vaults">
@@ -283,49 +292,7 @@ export default function Dashboard() {
                 )}
             </div>
 
-            {/* Contract Settings (Developer Mode) */}
-            <Card className="p-4 bg-white/5 border-white/10 mt-12">
-                <div className="flex flex-col gap-4">
-                    <div>
-                        <h3 className="text-sm font-bold text-white mb-1">Contract Configuration</h3>
-                        <p className="text-xs text-gray-400">Override the USDT address to match your specific testnet tokens.</p>
-                    </div>
-                    <div className="flex flex-col md:flex-row gap-3 items-end">
-                        <div className="w-full md:w-1/2">
-                            <label className="text-xs text-gray-500 mb-1 block">USDT Contract Address</label>
-                            <Input
-                                value={inputAddress || usdtAddress}
-                                onChange={(e) => setInputAddress(e.target.value)}
-                                placeholder="0x..."
-                                className="font-mono text-xs bg-black/20 text-white border-white/10"
-                            />
-                        </div>
-                        <div className="flex gap-2">
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                className="border-white/20 hover:bg-white/10"
-                                onClick={() => updateUsdtAddress(inputAddress)}
-                                disabled={!inputAddress || inputAddress === usdtAddress}
-                            >
-                                Save Address
-                            </Button>
-                            <Button
-                                size="sm"
-                                variant="ghost"
-                                className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                                onClick={resetDefaults}
-                            >
-                                Reset to Default
-                            </Button>
-                        </div>
-                    </div>
-                    <div className="text-xs font-mono text-gray-600">
-                        Current USDT: {usdtAddress} <br />
-                        Current Factory: {factoryAddress}
-                    </div>
-                </div>
-            </Card>
+           
 
         </div>
     );
