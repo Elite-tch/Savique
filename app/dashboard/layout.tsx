@@ -176,7 +176,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                                 </Button>
                             </>
                         ) : (
-                            <Button onClick={login} size="sm" className="gap-2 md:py-3 py-2 bg-primary hover:bg-primary/90 text-white rounded-full">
+                            <Button onClick={() => login()} className="gap-2 md:py-3 py-2 bg-primary hover:bg-primary/90 text-white rounded-full">
                                 <Wallet className="w-4 hidden sm:inline h-4" /> <span className="">Connect Wallet</span>
                             </Button>
                         )}
