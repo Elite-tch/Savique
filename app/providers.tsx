@@ -71,11 +71,16 @@ export default function Providers({ children }: { children: React.ReactNode }) {
         <PrivyProvider
             appId={process.env.NEXT_PUBLIC_PRIVY_APP_ID || "cl9c..."} // User will need to set this
             config={{
+                walletConnectCloudProjectId: "d76edd2ec72490269459a792d70e84fc",
                 loginMethods: ["email", "wallet"],
                 appearance: {
                     theme: "dark",
                     accentColor: "#E62058", // Flare Pink
                     logo: "/logo.png",
+                },
+                supportedChains: [flareCoston2, flare],
+                externalWallets: {
+                    walletConnect: { enabled: true },
                 },
             }}
         >
