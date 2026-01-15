@@ -12,6 +12,9 @@ import { useState, useEffect } from "react";
 import { VaultPreviewCard } from "@/components/VaultPreviewCard";
 import { useContractAddresses } from "@/hooks/useContractAddresses";
 import { Input } from "@/components/ui/input";
+import { usePrivy } from "@privy-io/react-auth";
+import { getUserVaultsFromDb, saveVault } from "@/lib/receiptService";
+import { usePublicClient } from "wagmi";
 
 
 function StatCard({ stat }: { stat: any }) {
@@ -47,7 +50,8 @@ function StatCard({ stat }: { stat: any }) {
 }
 
 export default function Dashboard() {
-    const { address, isConnected } = useAccount();
+    const { authenticated, ready } = usePrivy();
+    const { address, isConnected, isConnecting, isReconnecting } = useAccount();
     const { usdtAddress, factoryAddress, updateUsdtAddress, resetDefaults, isLoaded } = useContractAddresses();
     const [inputAddress, setInputAddress] = useState("");
     const [totalLocked, setTotalLocked] = useState("0.00");
@@ -75,21 +79,68 @@ export default function Dashboard() {
     }
 
     // Get user's vaults
-    const { data: vaultAddresses } = useReadContract({
-        address: factoryAddress,
-        abi: VAULT_FACTORY_ABI,
-        functionName: "getUserVaults",
-        args: address ? [address] : undefined,
-        query: {
-            enabled: !!address && isConnected && isLoaded
-        }
-    });
+    const [vaultAddresses, setVaultAddresses] = useState<string[] | undefined>(undefined);
+    const [loadingVaults, setLoadingVaults] = useState(true);
+
+    const publicClient = usePublicClient();
+
+    // Get user's vaults using Hybrid Sync (DB + Chain)
+    useEffect(() => {
+        const fetchVaults = async () => {
+            if (address && publicClient && factoryAddress) {
+                try {
+                    // 1. Get DB Vaults
+                    const dbVaults = await getUserVaultsFromDb(address);
+
+                    // 2. Get Chain Vaults
+                    let chainVaults: string[] = [];
+                    try {
+                        const rawChainVaults = await publicClient.readContract({
+                            address: factoryAddress,
+                            abi: VAULT_FACTORY_ABI,
+                            functionName: "getUserVaults",
+                            args: [address]
+                        });
+                        chainVaults = [...rawChainVaults].reverse();
+                    } catch (err) {
+                        console.warn("Failed to fetch chain vaults", err);
+                    }
+
+                    // 3. Merge
+                    const uniqueVaults = Array.from(new Set([...dbVaults, ...chainVaults]));
+                    setVaultAddresses(uniqueVaults);
+
+                    // 4. Backfill (Fire & Forget)
+                    const missingInDb = chainVaults.filter(v => !dbVaults.includes(v));
+                    if (missingInDb.length > 0) {
+                        missingInDb.forEach(async (vault) => {
+                            await saveVault({
+                                vaultAddress: vault,
+                                owner: address.toLowerCase(),
+                                factoryAddress: factoryAddress,
+                                createdAt: Date.now(),
+                                purpose: "Imported Vault"
+                            });
+                        });
+                    }
+
+                } catch (e) {
+                    console.error("Failed to load vaults", e);
+                } finally {
+                    setLoadingVaults(false);
+                }
+            } else {
+                setLoadingVaults(false);
+            }
+        };
+        fetchVaults();
+    }, [address, publicClient, factoryAddress]);
 
     const vaultCount = vaultAddresses?.length || 0;
 
     // Read balances from all vaults
     const vaultBalanceContracts = (vaultAddresses || []).map((vaultAddr) => ({
-        address: vaultAddr,
+        address: vaultAddr as `0x${string}`,
         abi: VAULT_ABI,
         functionName: 'totalAssets' as const,
     }));
@@ -103,7 +154,7 @@ export default function Dashboard() {
 
     // Read unlock timestamps from all vaults
     const vaultUnlockContracts = (vaultAddresses || []).map((vaultAddr) => ({
-        address: vaultAddr,
+        address: vaultAddr as `0x${string}`,
         abi: VAULT_ABI,
         functionName: 'unlockTimestamp' as const,
     }));
@@ -133,7 +184,7 @@ export default function Dashboard() {
         return false;
     });
 
-    const recentActiveVaults = [...activeVaultList].reverse().slice(0, 3);
+    const recentActiveVaults = [...activeVaultList].slice(0, 3);
 
     // Calculate Active and Completed vaults based on balance
     let activeVaultCount = 0;
@@ -156,11 +207,11 @@ export default function Dashboard() {
             }
         });
 
-        setTotalLocked(parseFloat(formatUnits(total, 18)).toFixed(2));
+        setTotalLocked(parseFloat(formatUnits(total, decimals || 18)).toFixed(2));
         // We can't update a local variable 'activeVaultCount' here to trigger re-render of stats, 
         // so we need a state or calculate it in render body if possible.
         // Actually, since vaultBalances is data, we can calculate derived state in render body.
-    }, [vaultBalances]);
+    }, [vaultBalances, decimals]);
 
     // Derived state calculation from data
     const activeInfo = (vaultBalances || []).reduce((acc, result) => {
@@ -175,9 +226,9 @@ export default function Dashboard() {
     const calculatedActiveCount = vaultBalances ? activeInfo : 0;
     const calculatedCompletedCount = (vaultAddresses?.length || 0) - calculatedActiveCount;
 
-    const formattedBalance = balance
+    const formattedBalance = isConnected && balance
         ? parseFloat(formatUnits(balance as bigint, decimals || 18)).toFixed(2)
-        : "0.00";
+        : "---";
 
     const stats = [
         {
@@ -210,7 +261,7 @@ export default function Dashboard() {
         },
     ];
 
-    if (!isConnected) {
+    if (!isConnected || !authenticated) {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
                 <Card className="p-12 text-center max-w-md bg-white/5 border-white/10">
@@ -287,12 +338,12 @@ export default function Dashboard() {
                     </Card>
                 ) : (
                     recentActiveVaults.map((vaultAddr, index) => (
-                        <VaultPreviewCard key={vaultAddr} address={vaultAddr} index={index} />
+                        <VaultPreviewCard key={vaultAddr} address={vaultAddr as `0x${string}`} index={index} />
                     ))
                 )}
             </div>
 
-           
+
 
         </div>
     );

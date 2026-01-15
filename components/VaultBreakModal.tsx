@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useProofRails } from "@proofrails/sdk/react";
 import { saveReceipt } from "@/lib/receiptService";
+import { createNotification } from "@/lib/notificationService";
 
 interface VaultBreakModalProps {
     isOpen: boolean;
@@ -105,6 +106,16 @@ export function VaultBreakModal({
                         proofRailsId: receiptResult?.id
                     });
 
+                    // Notify user
+                    createNotification(
+                        userAddress!,
+                        "Vault Broken - Penalty Applied",
+                        `You broke your vault early. Penalty: ${penaltyAmount.toFixed(2)} USDT. You received: ${amountToReceive.toFixed(2)} USDT.`,
+                        'warning',
+                        '/dashboard/history',
+                        receiptResult?.id
+                    );
+
                     toast.success("Receipt Generated", toastStyle);
                     onClose();
                     router.push("/dashboard/vaults");
@@ -123,6 +134,15 @@ export function VaultBreakModal({
                         type: 'breaked',
                         verified: false
                     });
+
+                    // Notify user even on error
+                    createNotification(
+                        userAddress!,
+                        "Vault Broken - Penalty Applied",
+                        `You broke your vault early. Penalty: ${penaltyAmount.toFixed(2)} USDT. You received: ${amountToReceive.toFixed(2)} USDT.`,
+                        'warning',
+                        '/dashboard/history'
+                    );
 
                     onClose();
                     router.push("/dashboard/vaults");

@@ -117,3 +117,62 @@ export async function migrateLocalStorageToFirestore(walletAddress: string): Pro
         throw error;
     }
 }
+
+// --- Vault Persistence ---
+const VAULTS_COLLECTION = 'user_vaults';
+
+export interface SavedVault {
+    vaultAddress: string;
+    owner: string;
+    factoryAddress: string;
+    createdAt: number;
+    purpose?: string;
+}
+
+export async function saveVault(data: SavedVault): Promise<string> {
+    try {
+        // Check if exists first to avoid duplicates
+        const vaultsRef = collection(db, VAULTS_COLLECTION);
+        const q = query(vaultsRef, where('vaultAddress', '==', data.vaultAddress));
+        const snapshot = await getDocs(q);
+
+        if (!snapshot.empty) {
+            console.log("Vault already saved:", data.vaultAddress);
+            return snapshot.docs[0].id;
+        }
+
+        const docRef = await addDoc(vaultsRef, {
+            ...data,
+            createdAt: Timestamp.now()
+        });
+        console.log('[Firebase] Vault saved:', data.vaultAddress);
+        return docRef.id;
+    } catch (error) {
+        console.error('Error saving vault:', error);
+        throw error;
+    }
+}
+
+export async function getUserVaultsFromDb(ownerAddress: string): Promise<string[]> {
+    try {
+        const vaultsRef = collection(db, VAULTS_COLLECTION);
+        const q = query(
+            vaultsRef,
+            where('owner', '==', ownerAddress.toLowerCase()),
+            orderBy('createdAt', 'desc')
+        );
+
+        const querySnapshot = await getDocs(q);
+        const addresses: string[] = [];
+        querySnapshot.forEach((doc) => {
+            const data = doc.data();
+            if (data.vaultAddress) {
+                addresses.push(data.vaultAddress);
+            }
+        });
+        return addresses;
+    } catch (error) {
+        console.error('Error fetching vaults from DB:', error);
+        return [];
+    }
+}

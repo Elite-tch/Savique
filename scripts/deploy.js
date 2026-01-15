@@ -12,7 +12,7 @@ async function main() {
     console.log(" Account balance:", ethers.formatEther(balance), "C2FLR\n");
 
     // TestToken address on Coston2
-    const USDT_ADDRESS = "0xCD92F943B0e809730E1882e35beAbD5e102bec52";
+    const USDT_ADDRESS = "0xC1A5B41512496B80903D1f32d6dEa3a73212E71F";
     console.log(" Using TestToken at:", USDT_ADDRESS, "\n");
 
     // Use deployer address as protocol treasury (can be changed later)

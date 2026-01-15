@@ -1,7 +1,7 @@
 // -------------------- Config --------------------
 export const CONTRACTS = {
     coston2: {
-        VaultFactory: "0x08f94e424028e8dcae5d62ed879774b8e7ade30d" as `0x${string}`,
+        VaultFactory: "0x71185A25db74E47F3a1e13b5ab112D3834B58e66" as `0x${string}`,
         USDTToken: "0xC1A5B41512496B80903D1f32d6dEa3a73212E71F" as `0x${string}`,
     },
 } as const;
@@ -11,7 +11,8 @@ export const VAULT_FACTORY_ABI = [
         inputs: [
             { name: "_purpose", type: "string" },
             { name: "_unlockTimestamp", type: "uint256" },
-            { name: "_penaltyBps", type: "uint256" }
+            { name: "_penaltyBps", type: "uint256" },
+            { name: "_initialDeposit", type: "uint256" }
         ],
         name: "createPersonalVault",
         outputs: [{ name: "", type: "address" }],

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useReadContract, useWriteContract, useWaitForTransactionReceipt, useAccount } from "wagmi";
-import { VAULT_ABI } from "@/lib/contracts";
+import { VAULT_ABI, ERC20_ABI, CONTRACTS } from "@/lib/contracts";
 import { formatUnits } from "viem";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,8 @@ import Link from "next/link";
 import { VaultBreakModal } from "@/components/VaultBreakModal";
 import { useProofRails } from "@proofrails/sdk/react";
 import { saveReceipt } from "@/lib/receiptService";
+import { usePrivy } from "@privy-io/react-auth";
+import { createNotification } from "@/lib/notificationService";
 
 const MOTIVATION_QUOTES = [
     "Discipline is doing what needs to be done, even if you don't want to do it.",
@@ -62,8 +64,10 @@ export default function VaultDetailPage() {
 
     const [quote, setQuote] = useState("");
     const [isBreakModalOpen, setIsBreakModalOpen] = useState(false);
-    const [isBalanceVisible, setIsBalanceVisible] = useState(false);
-    const { address: userAddress } = useAccount();
+    const { address: userAddress, isConnected } = useAccount();
+    const { authenticated } = usePrivy();
+
+
 
     // Add toast ref
     const toastId = useRef<string | number | null>(null);
@@ -86,12 +90,17 @@ export default function VaultDetailPage() {
     const { data: purpose } = useReadContract({ address, abi: VAULT_ABI, functionName: "purpose" });
     const { data: balanceResult } = useReadContract({ address, abi: VAULT_ABI, functionName: "totalAssets" });
     const { data: unlockTimeResult } = useReadContract({ address, abi: VAULT_ABI, functionName: "unlockTimestamp" });
+    const { data: decimals } = useReadContract({
+        address: CONTRACTS.coston2.USDTToken,
+        abi: ERC20_ABI,
+        functionName: 'decimals',
+    });
 
     // Withdrawal for unlocked vault
     const { writeContract, data: hash, isPending: isWithdrawPending, error: writeError } = useWriteContract();
     const { isLoading: isConfirming, isSuccess, data: receipt } = useWaitForTransactionReceipt({ hash });
 
-    const balance = balanceResult ? formatUnits(balanceResult, 18) : "0";
+    const balance = balanceResult ? formatUnits(balanceResult, decimals || 18) : "0";
     const unlockDate = unlockTimeResult ? new Date(Number(unlockTimeResult) * 1000) : new Date();
     const isLocked = new Date() < unlockDate;
     const countdown = useCountdown(unlockDate);
@@ -139,6 +148,15 @@ export default function VaultDetailPage() {
                         proofRailsId: receiptResult?.id
                     });
 
+                    // Notify
+                    createNotification(
+                        userAddress!,
+                        "Transaction Completed",
+                        "Your vault transaction was successful and your funds are unlocked.",
+                        'success',
+                        '/dashboard/history'
+                    );
+
                     toast.success("Receipt Generated", toastStyle);
                     router.push("/dashboard/vaults");
                 } catch (error) {
@@ -175,6 +193,20 @@ export default function VaultDetailPage() {
             if (toastId.current) toast.dismiss(toastId.current);
         }
     };
+
+    if (!isConnected || !authenticated) {
+        return (
+            <div className="flex items-center justify-center min-h-[60vh]">
+                <Card className="p-12 text-center max-w-md bg-white/5 border-white/10">
+                    <Wallet className="w-16 h-16 text-gray-500 mx-auto mb-4" />
+                    <h2 className="text-2xl font-bold text-white mb-2">Connect Your Wallet</h2>
+                    <p className="text-gray-400">
+                        Please connect your wallet to view your dashboard and manage your vaults.
+                    </p>
+                </Card>
+            </div>
+        );
+    }
 
     if (!address) return <div>Invalid Vault Address</div>;
 
@@ -244,15 +276,9 @@ export default function VaultDetailPage() {
                             <div>
                                 <p className="text-sm text-zinc-500 mb-1">Total Balance</p>
                                 <h3 className="text-2xl font-bold text-white flex items-baseline gap-1">
-                                    {isBalanceVisible ? parseFloat(balance).toFixed(2) : "••••••"} <span className="text-sm font-normal text-zinc-500">USDT0</span>
+                                    {parseFloat(balance).toFixed(2)} <span className="text-sm font-normal text-zinc-500">USDT0</span>
                                 </h3>
                             </div>
-                            <button
-                                onClick={() => setIsBalanceVisible(!isBalanceVisible)}
-                                className="text-zinc-500 hover:text-white transition-colors"
-                            >
-                                {isBalanceVisible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                            </button>
                         </div>
                         <div className="flex items-center gap-2 text-xs text-zinc-500 pt-4 border-t border-zinc-800/50">
                             <ShieldCheck className="w-3 h-3 text-primary" />

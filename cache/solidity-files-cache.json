@@ -191,8 +191,8 @@
       ]
     },
     "C:\\Users\\pc\\Documents\\MY-PROJECTS\\safevault\\contracts\\VaultFactory.sol": {
-      "lastModificationDate": 1768213345965,
-      "contentHash": "30442e864b18b2d896091ee40983439a",
+      "lastModificationDate": 1768494038326,
+      "contentHash": "c6c442c8dc1e1a8c8e6605c0102558db",
       "sourceName": "contracts/VaultFactory.sol",
       "solcConfig": {
         "version": "0.8.20",
@@ -219,7 +219,9 @@
         }
       },
       "imports": [
-        "./PersonalVault.sol"
+        "./PersonalVault.sol",
+        "@openzeppelin/contracts/token/ERC20/IERC20.sol",
+        "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol"
       ],
       "versionPragmas": [
         "^0.8.20"

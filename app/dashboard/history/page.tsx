@@ -3,13 +3,17 @@
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Receipt as ReceiptIcon, ExternalLink, CheckCircle, Calendar, Clock } from "lucide-react";
+import { Receipt as ReceiptIcon, ExternalLink, CheckCircle, Calendar, Clock, Wallet } from "lucide-react";
+import { usePrivy } from "@privy-io/react-auth";
 import { motion } from "framer-motion";
 import { useAccount } from "wagmi";
 import { getReceiptsByWallet, Receipt } from "@/lib/receiptService";
 
 export default function HistoryPage() {
-    const { address: currentAddress } = useAccount();
+    const { authenticated, ready } = usePrivy();
+    const { address: currentAddress, isConnected, isConnecting, isReconnecting } = useAccount();
+
+
     const [receipts, setReceipts] = useState<Receipt[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
@@ -45,6 +49,20 @@ export default function HistoryPage() {
     const viewOnExplorer = (txHash: string) => {
         window.open(`https://coston2-explorer.flare.network/tx/${txHash}`, '_blank');
     };
+
+    if (!isConnected || !authenticated) {
+        return (
+            <div className="flex items-center justify-center min-h-[60vh]">
+                <Card className="p-12 text-center max-w-md bg-white/5 border-white/10">
+                    <Wallet className="w-16 h-16 text-gray-500 mx-auto mb-4" />
+                    <h2 className="text-2xl font-bold text-white mb-2">Connect Your Wallet</h2>
+                    <p className="text-gray-400">
+                        Please connect your wallet to view your dashboard and manage your vaults.
+                    </p>
+                </Card>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-8">

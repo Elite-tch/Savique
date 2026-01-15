@@ -2,12 +2,16 @@
 pragma solidity ^0.8.20;
 
 import "./PersonalVault.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title VaultFactory
  * @dev Deploys ERC-20 Token (USDT) Vaults.
  */
 contract VaultFactory {
+    using SafeERC20 for IERC20;
+
     address public immutable usdtToken; // USDT token address on Coston2
     address[] public allVaults;
     mapping(address => bool) public isVault;
@@ -39,12 +43,14 @@ contract VaultFactory {
      * @param _purpose Description of the vault's purpose
      * @param _unlockTimestamp Unix timestamp when vault unlocks
      * @param _penaltyBps Early withdrawal penalty in basis points (e.g., 500 = 5%)
+     * @param _initialDeposit Amount to deposit immediately (requires approval)
      * @return Address of the newly created vault
      */
     function createPersonalVault(
         string memory _purpose,
         uint256 _unlockTimestamp,
-        uint256 _penaltyBps
+        uint256 _penaltyBps,
+        uint256 _initialDeposit
     ) external returns (address) {
         PersonalVault vault = new PersonalVault(
             usdtToken,
@@ -59,6 +65,10 @@ contract VaultFactory {
         allVaults.push(vaultAddr);
         userVaults[msg.sender].push(vaultAddr);
         isVault[vaultAddr] = true;
+
+        if (_initialDeposit > 0) {
+            IERC20(usdtToken).safeTransferFrom(msg.sender, vaultAddr, _initialDeposit);
+        }
 
         emit PersonalVaultCreated(vaultAddr, msg.sender, _purpose, _unlockTimestamp);
         return vaultAddr;

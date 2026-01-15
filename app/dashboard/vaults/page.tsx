@@ -7,10 +7,12 @@ import { Plus, Lock, Search, Wallet, Clock, AlertTriangle, Calendar, Eye, EyeOff
 import Link from "next/link";
 import { Input } from "@/components/ui/input";
 import { useAccount, useReadContract } from "wagmi";
-import { CONTRACTS, VAULT_FACTORY_ABI, VAULT_ABI } from "@/lib/contracts";
+import { CONTRACTS, VAULT_FACTORY_ABI, VAULT_ABI, ERC20_ABI } from "@/lib/contracts";
 import { formatUnits } from "viem";
 import { motion } from "framer-motion";
-import { getReceiptsByWallet, Receipt } from "@/lib/receiptService";
+import { getReceiptsByWallet, Receipt, getUserVaultsFromDb, saveVault } from "@/lib/receiptService";
+import { usePrivy } from "@privy-io/react-auth";
+import { usePublicClient } from "wagmi";
 
 function useCountdown(targetDate: Date) {
     const [timeLeft, setTimeLeft] = useState({
@@ -57,6 +59,11 @@ function VaultCard({ address }: { address: `0x${string}` }) {
         abi: VAULT_ABI,
         functionName: "purpose",
     });
+    const { data: decimals } = useReadContract({
+        address: CONTRACTS.coston2.USDTToken,
+        abi: ERC20_ABI,
+        functionName: 'decimals',
+    });
 
     const { data: balanceResult } = useReadContract({
         address,
@@ -70,11 +77,10 @@ function VaultCard({ address }: { address: `0x${string}` }) {
         functionName: "unlockTimestamp",
     });
 
-    const [isVisible, setIsVisible] = useState(false);
     const [creationDate, setCreationDate] = useState<Date | null>(null);
     const { address: userAddress } = useAccount();
 
-    const balance = balanceResult ? formatUnits(balanceResult, 18) : "0";
+    const balance = balanceResult ? formatUnits(balanceResult, decimals || 18) : "0";
     const unlockDate = unlockTimeResult ? new Date(Number(unlockTimeResult) * 1000) : new Date();
     const isLocked = new Date() < unlockDate;
 
@@ -105,7 +111,8 @@ function VaultCard({ address }: { address: `0x${string}` }) {
         }
     }, [userAddress, purpose]);
 
-    if (parseFloat(balance) <= 0) return null;
+    if (parseFloat(balance) <= 0) return null; // Hide empty vaults (broken or withdrawn)
+
 
     const formatCountdown = () => {
         if (countdown.isExpired) return "Unlocked!";
@@ -162,15 +169,9 @@ function VaultCard({ address }: { address: `0x${string}` }) {
                                 <div>
                                     <p className="text-xs text-gray-500 mb-1">Total Savings</p>
                                     <div className="text-lg font-bold text-white flex items-center gap-1">
-                                        {isVisible ? parseFloat(balance).toFixed(2) : "••••••"} <span className="text-xs font-normal text-gray-500">USDT0</span>
+                                        {parseFloat(balance).toFixed(2)} <span className="text-xs font-normal text-gray-500">USDT0</span>
                                     </div>
                                 </div>
-                                <button
-                                    onClick={(e) => { e.preventDefault(); setIsVisible(!isVisible); }}
-                                    className="p-1 hover:bg-white/10 rounded-full text-gray-500 hover:text-white transition-colors"
-                                >
-                                    {isVisible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                                </button>
                             </div>
                         </div>
                     </div>
@@ -181,17 +182,84 @@ function VaultCard({ address }: { address: `0x${string}` }) {
 }
 
 export default function VaultsPage() {
-    const { address, isConnected } = useAccount();
+    const { authenticated, ready } = usePrivy();
+    const { address, isConnected, isConnecting, isReconnecting } = useAccount();
 
-    const { data: vaultAddresses, isLoading } = useReadContract({
-        address: CONTRACTS.coston2.VaultFactory,
-        abi: VAULT_FACTORY_ABI,
-        functionName: "getUserVaults",
-        args: address ? [address] : undefined,
-        query: { enabled: !!address && isConnected }
-    });
+
+
+    const [vaultAddresses, setVaultAddresses] = useState<string[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const publicClient = usePublicClient();
+
+    useEffect(() => {
+        const loadVaults = async () => {
+            if (address && publicClient) {
+                try {
+                    // 1. Get DB Vaults
+                    const dbVaults = await getUserVaultsFromDb(address);
+
+                    // 2. Get Chain Vaults (Hybrid fallback/sync)
+                    let chainVaults: string[] = [];
+                    try {
+                        const rawChainVaults = await publicClient.readContract({
+                            address: CONTRACTS.coston2.VaultFactory,
+                            abi: VAULT_FACTORY_ABI,
+                            functionName: "getUserVaults",
+                            args: [address]
+                        });
+                        chainVaults = [...rawChainVaults].reverse();
+                    } catch (err) {
+                        console.warn("Failed to fetch chain vaults", err);
+                    }
+
+                    // 3. Merge Unique
+                    const uniqueVaults = Array.from(new Set([...dbVaults, ...chainVaults]));
+                    setVaultAddresses(uniqueVaults);
+
+                    // 4. Backfill DB if needed (Background)
+                    const missingInDb = chainVaults.filter(v => !dbVaults.includes(v));
+                    if (missingInDb.length > 0) {
+                        console.log("Found missing vaults to sync:", missingInDb.length);
+                        missingInDb.forEach(async (vault) => {
+                            await saveVault({
+                                vaultAddress: vault,
+                                owner: address.toLowerCase(),
+                                factoryAddress: CONTRACTS.coston2.VaultFactory,
+                                createdAt: Date.now(), // Estimate
+                                purpose: "Imported Vault" // Placeholder
+                            });
+                        });
+                    }
+
+                } catch (e) {
+                    console.error("Failed to load vaults from DB", e);
+                } finally {
+                    setIsLoading(false);
+                }
+            } else {
+                setVaultAddresses([]);
+                setIsLoading(isConnected ? true : false);
+            }
+        };
+
+        loadVaults();
+    }, [address, isConnected, publicClient]);
 
     const hasVaults = vaultAddresses && vaultAddresses.length > 0;
+
+    if (!isConnected || !authenticated) {
+        return (
+            <div className="flex items-center justify-center min-h-[60vh]">
+                <Card className="p-12 text-center max-w-md bg-white/5 border-white/10">
+                    <Wallet className="w-16 h-16 text-gray-500 mx-auto mb-4" />
+                    <h2 className="text-2xl font-bold text-white mb-2">Connect Your Wallet</h2>
+                    <p className="text-gray-400">
+                        Please connect your wallet to view your dashboard and manage your vaults.
+                    </p>
+                </Card>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-8">
@@ -221,8 +289,8 @@ export default function VaultsPage() {
                     </div>
                 ) : hasVaults ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {[...vaultAddresses].reverse().map((addr) => (
-                            <VaultCard key={addr} address={addr} />
+                        {vaultAddresses.map((addr) => (
+                            <VaultCard key={addr} address={addr as `0x${string}`} />
                         ))}
                     </div>
                 ) : (

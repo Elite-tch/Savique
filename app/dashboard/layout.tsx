@@ -7,8 +7,66 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { Shield, LayoutDashboard, PlusCircle, History, LogOut, Wallet, User, Lock, Menu, X } from "lucide-react";
+import { useDisconnect } from "wagmi";
 
 import { Button } from "@/components/ui/button";
+import { NotificationBell } from "@/components/NotificationBell";
+import { getUserVaultsFromDb } from "@/lib/receiptService";
+import { createNotification } from "@/lib/notificationService";
+import { usePublicClient } from "wagmi";
+import { CONTRACTS, VAULT_ABI } from "@/lib/contracts";
+
+function useDeadlinePulse(address?: string) {
+    const publicClient = usePublicClient();
+
+    useEffect(() => {
+        if (!address || !publicClient) return;
+
+        const checkDeadlines = async () => {
+            try {
+                // Get vaults
+                const vaults = await getUserVaultsFromDb(address);
+
+                for (const vaultAddr of vaults) {
+                    try {
+                        const unlockTime = await publicClient.readContract({
+                            address: vaultAddr as `0x${string}`,
+                            abi: VAULT_ABI,
+                            functionName: "unlockTimestamp"
+                        });
+
+                        const unlockDate = new Date(Number(unlockTime) * 1000);
+                        const now = new Date();
+                        const diffHours = (unlockDate.getTime() - now.getTime()) / (1000 * 60 * 60);
+
+                        // Check if within 24 hours and not expired
+                        if (diffHours > 0 && diffHours <= 24) {
+                            const key = `notified_deadline_${vaultAddr}_${unlockDate.getDate()}`;
+                            const notified = localStorage.getItem(key);
+
+                            if (!notified) {
+                                await createNotification(
+                                    address,
+                                    "Vault Unlocking Soon",
+                                    `Your vault is set to unlock in less than ${Math.ceil(diffHours)} hours. Get ready!`,
+                                    'info',
+                                    `/dashboard/vaults/${vaultAddr}`
+                                );
+                                localStorage.setItem(key, "true");
+                            }
+                        }
+                    } catch (e) {
+                        console.error("Error checking vault deadline:", e);
+                    }
+                }
+            } catch (e) {
+                console.error("Pulse check failed:", e);
+            }
+        };
+
+        checkDeadlines();
+    }, [address, publicClient]);
+}
 
 const QUOTES = [
     "Consistency is the key to financial freedom.",
@@ -111,10 +169,19 @@ function SidebarContent({ pathname, onNavigate }: { pathname: string; onNavigate
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
     const { logout, login, user, authenticated, ready } = usePrivy();
+    const { disconnect } = useDisconnect();
     const pathname = usePathname();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-    const walletAddress = authenticated && user?.wallet?.address ? user.wallet.address : null;
+    const walletAddress = authenticated && user?.wallet?.address ? user.wallet.address : undefined;
+    useDeadlinePulse(walletAddress);
+
+    const handleLogout = async () => {
+        await logout();
+        disconnect();
+    };
+
+
     const shortAddress = walletAddress ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : "";
 
     return (
@@ -168,10 +235,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     <div className="flex items-center gap-4">
                         {ready && authenticated && walletAddress ? (
                             <>
+                                <NotificationBell />
                                 <div className="hidden md:flex items-center gap-3 px-4 py-2 bg-white/5 rounded-full border border-white/5">
                                     <span className="text-sm font-medium text-gray-200">{shortAddress}</span>
                                 </div>
-                                <Button onClick={logout} variant="ghost" size="icon" className="text-gray-400 hover:text-red-400 hover:bg-red-400/10 rounded-full">
+                                <Button onClick={handleLogout} variant="ghost" size="icon" className="text-gray-400 hover:text-red-400 hover:bg-red-400/10 rounded-full">
                                     <LogOut className="w-5 h-5" />
                                 </Button>
                             </>
