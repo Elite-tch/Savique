@@ -13,14 +13,12 @@ import { toast } from "sonner";
 import { parseUnits, formatUnits, decodeEventLog } from "viem";
 import { useProofRails } from "@proofrails/sdk/react";
 import { saveReceipt, saveVault } from "@/lib/receiptService";
-import { usePrivy } from "@privy-io/react-auth";
 import { createNotification } from "@/lib/notificationService";
 
 const MAX_UINT256 = BigInt("115792089237316195423570985008687907853269984665640564039457584007913129639935");
 
 export default function CreatePersonalVault() {
     const router = useRouter();
-    const { authenticated, ready } = usePrivy();
     const { address, isConnected, isConnecting, isReconnecting } = useAccount();
 
 
@@ -53,7 +51,8 @@ export default function CreatePersonalVault() {
     const [formData, setFormData] = useState({
         purpose: "",
         amount: "",
-        duration: "30"
+        duration: "30",
+        durationUnit: "days" as "minutes" | "hours" | "days"
     });
 
     const [customDuration, setCustomDuration] = useState("");
@@ -167,8 +166,15 @@ export default function CreatePersonalVault() {
     }, [writeError]);
 
     const triggerCreateVault = () => {
-        const durationDays = customDuration ? parseInt(customDuration) : parseInt(formData.duration);
-        const unlockTimestamp = Math.floor(Date.now() / 1000) + (durationDays * 24 * 60 * 60);
+        const val = customDuration ? parseInt(customDuration) : parseInt(formData.duration);
+        const unit = formData.durationUnit;
+
+        let seconds = 0;
+        if (unit === 'minutes') seconds = val * 60;
+        else if (unit === 'hours') seconds = val * 60 * 60;
+        else seconds = val * 24 * 60 * 60;
+
+        const unlockTimestamp = Math.floor(Date.now() / 1000) + seconds;
         const penaltyBps = FIXED_PENALTY * 100;
         const amountUnits = parseUnits(formData.amount, decimals || 18);
 
@@ -253,10 +259,10 @@ export default function CreatePersonalVault() {
             console.log("✅ ProofRails Receipt Created:", receiptResult);
 
             // Notify User
-            createNotification(
+            await createNotification(
                 address!,
-                "Vault Created Successfully",
-                `Your vault "${formData.purpose}" with ${formData.amount} USDT has been secured.`,
+                "Vault Created & Verified",
+                `Your vault "${formData.purpose}" has been secured and your digital receipt is verified.`,
                 'success',
                 `/dashboard/vaults/${targetVault}`,
                 receiptResult.id
@@ -265,6 +271,7 @@ export default function CreatePersonalVault() {
             // Save receipt to Firestore
             await saveReceipt({
                 walletAddress: address!.toLowerCase(),
+                vaultAddress: targetVault,
                 txHash: txHashStr,
                 timestamp: Date.now(),
                 purpose: formData.purpose,
@@ -283,6 +290,7 @@ export default function CreatePersonalVault() {
             // Even on error, save the transaction
             await saveReceipt({
                 walletAddress: address!.toLowerCase(),
+                vaultAddress: targetVault,
                 txHash: txHashStr,
                 timestamp: Date.now(),
                 purpose: formData.purpose,
@@ -290,6 +298,15 @@ export default function CreatePersonalVault() {
                 verified: false,
                 type: 'created'
             });
+
+            // Notify user even on error
+            await createNotification(
+                address!,
+                "Vault Created - Receipt Pending",
+                `Your vault "${formData.purpose}" is active, but your digital receipt is still processing. It will verify automatically soon.`,
+                'info',
+                `/dashboard/vaults/${targetVault}`
+            );
 
             toast.error("Receipt Gen Failed but Vault Created", toastStyle);
             setCurrentStep('done');
@@ -311,8 +328,14 @@ export default function CreatePersonalVault() {
         handleCreate();
     };
 
-    const durationDays = customDuration ? parseInt(customDuration) : parseInt(formData.duration);
-    const unlockDate = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000);
+    const val = customDuration ? parseInt(customDuration) : parseInt(formData.duration);
+    const unit = formData.durationUnit;
+    let ms = 0;
+    if (unit === 'minutes') ms = val * 60 * 1000;
+    else if (unit === 'hours') ms = val * 60 * 60 * 1000;
+    else ms = val * 24 * 60 * 60 * 1000;
+
+    const unlockDate = new Date(Date.now() + ms);
     const potentialPenalty = formData.amount ? (parseFloat(formData.amount) * FIXED_PENALTY / 100).toFixed(4) : "0";
 
     // UI Helpers
@@ -325,7 +348,7 @@ export default function CreatePersonalVault() {
         return "Create & Lock Funds";
     };
 
-    if (!isConnected || !authenticated) {
+    if (!isConnected) {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
                 <Card className="p-12 text-center max-w-md bg-white/5 border-white/10">
@@ -398,39 +421,103 @@ export default function CreatePersonalVault() {
 
                             {/* Lock Duration */}
                             <div className="space-y-3">
-                                <label className="text-sm font-semibold text-white flex items-center gap-2">
-                                    <Calendar className="w-4 h-4 text-primary" />
-                                    Lock Duration
-                                </label>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                    {[
-                                        { days: '7', label: '1 Week' },
-                                        { days: '30', label: '1 Month' },
-                                        { days: '90', label: '3 Months' },
-                                        { days: '180', label: '6 Months' },
-                                        { days: '365', label: '1 Year' },
-                                        { days: '730', label: '2 Years' }
-                                    ].map((option) => (
-                                        <button
-                                            type="button"
-                                            key={option.days}
-                                            onClick={() => {
-                                                setFormData({ ...formData, duration: option.days });
-                                                setCustomDuration("");
-                                            }}
-                                            disabled={isProcessing}
-                                            className={`p-3 rounded-xl text-sm font-medium border-2 transition-all ${formData.duration === option.days ? 'bg-primary/20 border-primary text-white' : 'border-white/10 text-gray-400'}`}
-                                        >
-                                            <div className="font-bold">{option.label}</div>
-                                            <div className="text-xs opacity-70">{option.days} days</div>
-                                        </button>
-                                    ))}
+                                <div className="flex justify-between items-center">
+                                    <label className="text-sm font-semibold text-white flex items-center gap-2">
+                                        <Calendar className="w-4 h-4 text-primary" />
+                                        Lock Duration
+                                    </label>
+                                    <div className="flex bg-white/5 p-1 rounded-lg border border-white/10">
+                                        {(['minutes', 'hours', 'days'] as const).map((u) => (
+                                            <button
+                                                key={u}
+                                                type="button"
+                                                onClick={() => setFormData({ ...formData, durationUnit: u })}
+                                                className={`px-3 py-1 rounded-md text-[10px] uppercase font-bold transition-all ${formData.durationUnit === u ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-gray-500 hover:text-gray-300'}`}
+                                            >
+                                                {u}
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
+
+                                {formData.durationUnit === 'days' && (
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                        {[
+                                            { val: '7', label: '1 Week' },
+                                            { val: '30', label: '1 Month' },
+                                            { val: '90', label: '3 Months' },
+                                            { val: '180', label: '6 Months' },
+                                        ].map((option) => (
+                                            <button
+                                                type="button"
+                                                key={option.val}
+                                                onClick={() => {
+                                                    setFormData({ ...formData, duration: option.val, durationUnit: 'days' });
+                                                    setCustomDuration("");
+                                                }}
+                                                disabled={isProcessing}
+                                                className={`p-3 rounded-xl text-sm font-medium border-2 transition-all ${formData.duration === option.val && formData.durationUnit === 'days' && !customDuration ? 'bg-primary/20 border-primary text-white' : 'border-white/10 text-gray-400'}`}
+                                            >
+                                                <div className="font-bold">{option.label}</div>
+                                                <div className="text-xs opacity-70">{option.val} days</div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {formData.durationUnit === 'hours' && (
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                        {[
+                                            { val: '1', label: '1 Hour' },
+                                            { val: '6', label: '6 Hours' },
+                                            { val: '12', label: '12 Hours' },
+                                            { val: '24', label: '24 Hours' },
+                                        ].map((option) => (
+                                            <button
+                                                type="button"
+                                                key={option.val}
+                                                onClick={() => {
+                                                    setFormData({ ...formData, duration: option.val, durationUnit: 'hours' });
+                                                    setCustomDuration("");
+                                                }}
+                                                disabled={isProcessing}
+                                                className={`p-3 rounded-xl text-sm font-medium border-2 transition-all ${formData.duration === option.val && formData.durationUnit === 'hours' && !customDuration ? 'bg-primary/20 border-primary text-white' : 'border-white/10 text-gray-400'}`}
+                                            >
+                                                <div className="font-bold">{option.label}</div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {formData.durationUnit === 'minutes' && (
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                        {[
+                                            { val: '5', label: '5 Mins' },
+                                            { val: '15', label: '15 Mins' },
+                                            { val: '30', label: '30 Mins' },
+                                            { val: '45', label: '45 Mins' },
+                                        ].map((option) => (
+                                            <button
+                                                type="button"
+                                                key={option.val}
+                                                onClick={() => {
+                                                    setFormData({ ...formData, duration: option.val, durationUnit: 'minutes' });
+                                                    setCustomDuration("");
+                                                }}
+                                                disabled={isProcessing}
+                                                className={`p-3 rounded-xl text-sm font-medium border-2 transition-all ${formData.duration === option.val && formData.durationUnit === 'minutes' && !customDuration ? 'bg-primary/20 border-primary text-white' : 'border-white/10 text-gray-400'}`}
+                                            >
+                                                <div className="font-bold">{option.label}</div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+
                                 {/* Custom Duration */}
                                 <div className="mt-4">
                                     <input
                                         type="number"
-                                        placeholder="Custom days..."
+                                        placeholder={`Custom ${formData.durationUnit}...`}
                                         className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:border-primary/50 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                         value={customDuration}
                                         disabled={isProcessing}
@@ -440,7 +527,7 @@ export default function CreatePersonalVault() {
                                         }}
                                     />
                                 </div>
-                                <p className="text-xs text-gray-500">Unlocks on: {unlockDate.toLocaleDateString()}</p>
+                                <p className="text-xs text-gray-500">Unlocks on: {unlockDate.toLocaleString()}</p>
                             </div>
 
                             {/* Steps Progress, visual only if processing */}

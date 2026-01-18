@@ -1,7 +1,12 @@
 "use client";
 
-import { PrivyProvider } from "@privy-io/react-auth";
-import { createConfig, WagmiProvider } from "@privy-io/wagmi";
+import '@rainbow-me/rainbowkit/styles.css';
+import {
+    getDefaultConfig,
+    RainbowKitProvider,
+    darkTheme,
+} from '@rainbow-me/rainbowkit';
+import { WagmiProvider } from 'wagmi';
 import { defineChain } from "viem";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { http } from "viem";
@@ -36,9 +41,10 @@ export const flareCoston2 = defineChain({
     rpcUrls: {
         default: {
             http: [
+                "https://coston2-api.flare.network/ext/C/rpc",
                 "https://flare-testnet-coston2.rpc.thirdweb.com",
                 "https://coston2.enosys.global/ext/C/rpc",
-                "https://coston2-api.flare.network/ext/C/rpc"
+                "https://rpc.ankr.com/flare_coston2"
             ]
         },
     },
@@ -48,51 +54,49 @@ export const flareCoston2 = defineChain({
     testnet: true,
 });
 
-export const wagmiConfig = createConfig({
+export const wagmiConfig = getDefaultConfig({
+    appName: 'SafeVault',
+    projectId: 'd76edd2ec72490269459a792d70e84fc', // Using the provided Project ID
     chains: [flareCoston2, flare],
     transports: {
         [flareCoston2.id]: http(undefined, {
-            timeout: 30_000,
-            retryCount: 3,
-            retryDelay: 1000,
+            batch: true,
+            timeout: 60_000,
+            retryCount: 5,
+            retryDelay: 2000,
         }),
         [flare.id]: http(undefined, {
-            timeout: 30_000,
-            retryCount: 3,
-            retryDelay: 1000,
+            batch: true,
+            timeout: 60_000,
+            retryCount: 5,
+            retryDelay: 2000,
         }),
     },
+    ssr: true, // If your dApp uses server side rendering (SSR)
 });
 
 const queryClient = new QueryClient();
 
 export default function Providers({ children }: { children: React.ReactNode }) {
     return (
-        <PrivyProvider
-            appId={process.env.NEXT_PUBLIC_PRIVY_APP_ID || "cl9c..."} // User will need to set this
-            config={{
-                walletConnectCloudProjectId: "d76edd2ec72490269459a792d70e84fc",
-                loginMethods: ["email", "wallet"],
-                appearance: {
-                    theme: "dark",
-                    accentColor: "#E62058", // Flare Pink
-                    logo: "/logo.png",
-                },
-                supportedChains: [flareCoston2, flare],
-                externalWallets: {
-                    walletConnect: { enabled: true },
-                },
-            }}
-        >
+        <WagmiProvider config={wagmiConfig}>
             <QueryClientProvider client={queryClient}>
-                <WagmiProvider config={wagmiConfig}>
-                    <AutoDisconnect />
+                <RainbowKitProvider
+                    theme={darkTheme({
+                        accentColor: '#E62058',
+                        accentColorForeground: 'white',
+                        borderRadius: 'large',
+                        fontStack: 'system',
+                        overlayBlur: 'small',
+                    })}
+                >
                     <ProofRailsProvider apiKey={process.env.NEXT_PUBLIC_PROOFRAILS_KEY || ""}>
+                        <AutoDisconnect />
                         {children}
                         <Toaster position="top-right" theme="dark" richColors closeButton />
                     </ProofRailsProvider>
-                </WagmiProvider>
+                </RainbowKitProvider>
             </QueryClientProvider>
-        </PrivyProvider>
+        </WagmiProvider>
     );
 }

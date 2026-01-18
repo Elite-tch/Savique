@@ -12,6 +12,7 @@ import {
 export interface Receipt {
     id?: string;
     walletAddress: string;
+    vaultAddress?: string; // Optinal for backward compatibility
     txHash: string;
     timestamp: number;
     purpose: string;
@@ -37,6 +38,21 @@ export async function saveReceipt(receipt: Omit<Receipt, 'id'>): Promise<string>
         return docRef.id;
     } catch (error) {
         console.error('[Firebase] Error saving receipt:', error);
+        throw error;
+    }
+}
+
+/**
+ * Update an existing receipt in Firestore
+ */
+export async function updateReceipt(id: string, updates: Partial<Receipt>): Promise<void> {
+    try {
+        const { updateDoc, doc } = await import('firebase/firestore');
+        const docRef = doc(db, RECEIPTS_COLLECTION, id);
+        await updateDoc(docRef, { ...updates });
+        console.log('[Firebase] Receipt updated:', id);
+    } catch (error) {
+        console.error('[Firebase] Error updating receipt:', error);
         throw error;
     }
 }

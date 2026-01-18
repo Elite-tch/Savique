@@ -1,13 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { usePrivy } from "@privy-io/react-auth";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { Shield, LayoutDashboard, PlusCircle, History, LogOut, Wallet, User, Lock, Menu, X } from "lucide-react";
-import { useDisconnect } from "wagmi";
+import { useDisconnect, useAccount } from "wagmi";
+import { ConnectButton } from '@rainbow-me/rainbowkit';
 
 import { Button } from "@/components/ui/button";
 import { NotificationBell } from "@/components/NotificationBell";
@@ -15,6 +15,7 @@ import { getUserVaultsFromDb } from "@/lib/receiptService";
 import { createNotification } from "@/lib/notificationService";
 import { usePublicClient } from "wagmi";
 import { CONTRACTS, VAULT_ABI } from "@/lib/contracts";
+import { ReceiptSync } from "@/components/ReceiptSync";
 
 function useDeadlinePulse(address?: string) {
     const publicClient = usePublicClient();
@@ -26,6 +27,9 @@ function useDeadlinePulse(address?: string) {
             try {
                 // Get vaults
                 const vaults = await getUserVaultsFromDb(address);
+                if (!vaults || vaults.length === 0) return;
+
+                console.log(`[Pulse] Checking ${vaults.length} vaults for deadlines...`);
 
                 for (const vaultAddr of vaults) {
                     try {
@@ -55,12 +59,17 @@ function useDeadlinePulse(address?: string) {
                                 localStorage.setItem(key, "true");
                             }
                         }
+
+                        // Small delay to reduce RPC pressure
+                        await new Promise(resolve => setTimeout(resolve, 200));
+
                     } catch (e) {
-                        console.error("Error checking vault deadline:", e);
+                        // Just log and continue to next vault
+                        console.warn(`[Pulse] Failed to check vault ${vaultAddr}:`, e);
                     }
                 }
             } catch (e) {
-                console.error("Pulse check failed:", e);
+                console.error("[Pulse] Critical check failure:", e);
             }
         };
 
@@ -168,19 +177,16 @@ function SidebarContent({ pathname, onNavigate }: { pathname: string; onNavigate
 }
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-    const { logout, login, user, authenticated, ready } = usePrivy();
+    const { address: walletAddress, isConnected } = useAccount();
     const { disconnect } = useDisconnect();
     const pathname = usePathname();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-    const walletAddress = authenticated && user?.wallet?.address ? user.wallet.address : undefined;
     useDeadlinePulse(walletAddress);
 
-    const handleLogout = async () => {
-        await logout();
+    const handleLogout = () => {
         disconnect();
     };
-
 
     const shortAddress = walletAddress ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : "";
 
@@ -233,20 +239,33 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     </div>
 
                     <div className="flex items-center gap-4">
-                        {ready && authenticated && walletAddress ? (
-                            <>
+                        {isConnected ? (
+                            <div className="flex items-center gap-4">
                                 <NotificationBell />
-                                <div className="hidden md:flex items-center gap-3 px-4 py-2 bg-white/5 rounded-full border border-white/5">
-                                    <span className="text-sm font-medium text-gray-200">{shortAddress}</span>
+                                <ReceiptSync />
+                                <div className="hidden md:block">
+                                    <ConnectButton
+                                        accountStatus="address"
+                                        showBalance={false}
+                                        chainStatus="icon"
+                                    />
                                 </div>
-                                <Button onClick={handleLogout} variant="ghost" size="icon" className="text-gray-400 hover:text-red-400 hover:bg-red-400/10 rounded-full">
-                                    <LogOut className="w-5 h-5" />
-                                </Button>
-                            </>
+                                <div className="md:hidden">
+                                    <ConnectButton
+                                        accountStatus="avatar"
+                                        showBalance={false}
+                                        chainStatus="none"
+                                    />
+                                </div>
+                            </div>
                         ) : (
-                            <Button onClick={() => login()} className="gap-2 md:py-3 py-2 bg-primary hover:bg-primary/90 text-white rounded-full">
-                                <Wallet className="w-4 hidden sm:inline h-4" /> <span className="">Connect Wallet</span>
-                            </Button>
+                            <ConnectButton.Custom>
+                                {({ openConnectModal }) => (
+                                    <Button onClick={openConnectModal} className="gap-2 md:py-3 py-2 bg-primary hover:bg-primary/90 text-white rounded-full">
+                                        <Wallet className="w-4 hidden sm:inline h-4" /> <span className="">Connect Wallet</span>
+                                    </Button>
+                                )}
+                            </ConnectButton.Custom>
                         )}
                     </div>
                 </header>

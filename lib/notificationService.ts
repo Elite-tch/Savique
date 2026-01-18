@@ -99,5 +99,7 @@ export function subscribeToNotifications(
             });
         });
         callback(notifications);
+    }, (error) => {
+        console.error('[NotificationService] Subscription error:', error);
     });
 }

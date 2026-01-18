@@ -96,6 +96,7 @@ export function VaultBreakModal({
                     // Save "Breaked" receipt to Firestore
                     await saveReceipt({
                         walletAddress: userAddress!.toLowerCase(),
+                        vaultAddress: address,
                         txHash: receipt.transactionHash,
                         timestamp: Date.now(),
                         purpose: purpose || "Vault Broken",
@@ -107,10 +108,10 @@ export function VaultBreakModal({
                     });
 
                     // Notify user
-                    createNotification(
+                    await createNotification(
                         userAddress!,
-                        "Vault Broken - Penalty Applied",
-                        `You broke your vault early. Penalty: ${penaltyAmount.toFixed(2)} USDT. You received: ${amountToReceive.toFixed(2)} USDT.`,
+                        "Vault Broken & Verified",
+                        `You broke "${purpose}" early. Your digital receipt is verified. Penalty applied.`,
                         'warning',
                         '/dashboard/history',
                         receiptResult?.id
@@ -126,6 +127,7 @@ export function VaultBreakModal({
                     // Fallback: save to Firestore even on error
                     await saveReceipt({
                         walletAddress: userAddress!.toLowerCase(),
+                        vaultAddress: address,
                         txHash: receipt.transactionHash,
                         timestamp: Date.now(),
                         purpose: purpose || "Vault Broken",
@@ -136,11 +138,11 @@ export function VaultBreakModal({
                     });
 
                     // Notify user even on error
-                    createNotification(
+                    await createNotification(
                         userAddress!,
-                        "Vault Broken - Penalty Applied",
-                        `You broke your vault early. Penalty: ${penaltyAmount.toFixed(2)} USDT. You received: ${amountToReceive.toFixed(2)} USDT.`,
-                        'warning',
+                        "Vault Broken - Receipt Pending",
+                        `Vault "${purpose}" broken successfully. Funds transferred, receipt will verify automatically soon.`,
+                        'info',
                         '/dashboard/history'
                     );
 

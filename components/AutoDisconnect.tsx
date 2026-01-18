@@ -1,23 +1,24 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { usePrivy } from "@privy-io/react-auth";
+import { useDisconnect, useAccount } from "wagmi";
 import { toast } from "sonner";
 
 const IDLE_TIMEOUT = 5 * 60 * 1000; // 5 minutes
 
 export function AutoDisconnect() {
-    const { logout, authenticated } = usePrivy();
+    const { disconnect } = useDisconnect();
+    const { isConnected } = useAccount();
     const timerRef = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
-        // Only run if user is authenticated
-        if (!authenticated) return;
+        // Only run if user is connected
+        if (!isConnected) return;
 
         const resetTimer = () => {
             if (timerRef.current) clearTimeout(timerRef.current);
             timerRef.current = setTimeout(() => {
-                logout();
+                disconnect();
                 toast.warning("Disconnected due to inactivity", {
                     duration: 5000,
                     description: "You have been disconnected for your security after 5 minutes of inactivity."
@@ -43,7 +44,7 @@ export function AutoDisconnect() {
                 window.removeEventListener(event, resetTimer);
             });
         };
-    }, [logout, authenticated]);
+    }, [disconnect, isConnected]);
 
     return null;
 }

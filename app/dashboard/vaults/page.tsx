@@ -11,7 +11,6 @@ import { CONTRACTS, VAULT_FACTORY_ABI, VAULT_ABI, ERC20_ABI } from "@/lib/contra
 import { formatUnits } from "viem";
 import { motion } from "framer-motion";
 import { getReceiptsByWallet, Receipt, getUserVaultsFromDb, saveVault } from "@/lib/receiptService";
-import { usePrivy } from "@privy-io/react-auth";
 import { usePublicClient } from "wagmi";
 
 function useCountdown(targetDate: Date) {
@@ -182,7 +181,6 @@ function VaultCard({ address }: { address: `0x${string}` }) {
 }
 
 export default function VaultsPage() {
-    const { authenticated, ready } = usePrivy();
     const { address, isConnected, isConnecting, isReconnecting } = useAccount();
 
 
@@ -247,7 +245,7 @@ export default function VaultsPage() {
 
     const hasVaults = vaultAddresses && vaultAddresses.length > 0;
 
-    if (!isConnected || !authenticated) {
+    if (!isConnected) {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
                 <Card className="p-12 text-center max-w-md bg-white/5 border-white/10">

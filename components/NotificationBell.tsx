@@ -25,6 +25,7 @@ export function NotificationBell() {
     // Subscribe to real-time notifications
     useEffect(() => {
         if (!address) return;
+        console.log('[NotificationBell] Subscribing for:', address);
         const unsubscribe = subscribeToNotifications(address, (data) => {
             console.log('[NotificationBell] Received notifications:', data);
             setNotifications(data);

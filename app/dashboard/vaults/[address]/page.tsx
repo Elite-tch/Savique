@@ -14,7 +14,6 @@ import Link from "next/link";
 import { VaultBreakModal } from "@/components/VaultBreakModal";
 import { useProofRails } from "@proofrails/sdk/react";
 import { saveReceipt } from "@/lib/receiptService";
-import { usePrivy } from "@privy-io/react-auth";
 import { createNotification } from "@/lib/notificationService";
 
 const MOTIVATION_QUOTES = [
@@ -65,12 +64,12 @@ export default function VaultDetailPage() {
     const [quote, setQuote] = useState("");
     const [isBreakModalOpen, setIsBreakModalOpen] = useState(false);
     const { address: userAddress, isConnected } = useAccount();
-    const { authenticated } = usePrivy();
 
 
 
     // Add toast ref
     const toastId = useRef<string | number | null>(null);
+    const [withdrawingAmount, setWithdrawingAmount] = useState<string>("0");
 
     // ProofRails Integration
     const sdk = useProofRails();
@@ -126,10 +125,12 @@ export default function VaultDetailPage() {
             toast.success("Transaction Successful", toastStyle);
 
             const generateReceipt = async () => {
+                const amountToSave = withdrawingAmount !== "0" ? withdrawingAmount : balance;
                 try {
+                    console.log(`[Withdraw] Generating receipt for ${amountToSave} USDT0...`);
                     // Generate ProofRails Receipt
                     const receiptResult = await sdk.templates.payment({
-                        amount: parseFloat(balance),
+                        amount: parseFloat(amountToSave),
                         from: address, // Vault
                         to: receipt.from, // User
                         purpose: `Vault Withdrawal: ${purpose}`,
@@ -139,22 +140,24 @@ export default function VaultDetailPage() {
                     // Save "Completed" receipt to Firestore
                     await saveReceipt({
                         walletAddress: userAddress!.toLowerCase(),
+                        vaultAddress: address,
                         txHash: receipt.transactionHash,
                         timestamp: Date.now(),
                         purpose: purpose || "Vault Withdrawal",
-                        amount: parseFloat(balance).toFixed(2),
+                        amount: parseFloat(amountToSave).toFixed(2),
                         type: 'completed',
                         verified: !!receiptResult?.id,
                         proofRailsId: receiptResult?.id
                     });
 
                     // Notify
-                    createNotification(
+                    await createNotification(
                         userAddress!,
-                        "Transaction Completed",
-                        "Your vault transaction was successful and your funds are unlocked.",
+                        "Withdrawal & Receipt Verified",
+                        `Successfully withdrew funds from your "${purpose}" vault. Your digital receipt has been verified.`,
                         'success',
-                        '/dashboard/history'
+                        '/dashboard/history',
+                        receiptResult?.id
                     );
 
                     toast.success("Receipt Generated", toastStyle);
@@ -166,22 +169,34 @@ export default function VaultDetailPage() {
                     // Fallback: save to Firestore even on error
                     await saveReceipt({
                         walletAddress: userAddress!.toLowerCase(),
+                        vaultAddress: address,
                         txHash: receipt.transactionHash,
                         timestamp: Date.now(),
                         purpose: purpose || "Vault Withdrawal",
-                        amount: parseFloat(balance).toFixed(2),
+                        amount: parseFloat(amountToSave).toFixed(2),
                         type: 'completed',
                         verified: false
                     });
+
+                    // Notify fallback
+                    await createNotification(
+                        userAddress!,
+                        "Withdrawal Success - Receipt Pending",
+                        `Funds from "${purpose}" are back in your wallet. Your receipt is still processing and will verify soon.`,
+                        'info',
+                        '/dashboard/history'
+                    );
+
                     router.push("/dashboard/vaults");
                 }
             };
             generateReceipt();
         }
-    }, [isSuccess, router, hash, purpose, balance, receipt, sdk, isGeneratingProof]);
+    }, [isSuccess, router, hash, purpose, balance, receipt, sdk, isGeneratingProof, withdrawingAmount, userAddress, address]);
 
     const handleWithdrawUnlocked = () => {
         try {
+            setWithdrawingAmount(balance); // Capture balance
             toastId.current = toast.loading("Initializing Transaction...", toastStyle);
             writeContract({
                 address,
@@ -194,7 +209,7 @@ export default function VaultDetailPage() {
         }
     };
 
-    if (!isConnected || !authenticated) {
+    if (!isConnected) {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
                 <Card className="p-12 text-center max-w-md bg-white/5 border-white/10">

@@ -12,7 +12,6 @@ import { useState, useEffect } from "react";
 import { VaultPreviewCard } from "@/components/VaultPreviewCard";
 import { useContractAddresses } from "@/hooks/useContractAddresses";
 import { Input } from "@/components/ui/input";
-import { usePrivy } from "@privy-io/react-auth";
 import { getUserVaultsFromDb, saveVault } from "@/lib/receiptService";
 import { usePublicClient } from "wagmi";
 
@@ -50,7 +49,6 @@ function StatCard({ stat }: { stat: any }) {
 }
 
 export default function Dashboard() {
-    const { authenticated, ready } = usePrivy();
     const { address, isConnected, isConnecting, isReconnecting } = useAccount();
     const { usdtAddress, factoryAddress, updateUsdtAddress, resetDefaults, isLoaded } = useContractAddresses();
     const [inputAddress, setInputAddress] = useState("");
@@ -261,7 +259,7 @@ export default function Dashboard() {
         },
     ];
 
-    if (!isConnected || !authenticated) {
+    if (!isConnected) {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
                 <Card className="p-12 text-center max-w-md bg-white/5 border-white/10">
