@@ -3,11 +3,13 @@
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Receipt as ReceiptIcon, ExternalLink, CheckCircle, Calendar, Clock, Wallet, Download } from "lucide-react";
+import { Receipt as ReceiptIcon, ExternalLink, CheckCircle, Calendar, Clock, Wallet, Download, FileText, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAccount } from "wagmi";
 import { getReceiptsByWallet, Receipt } from "@/lib/receiptService";
+import { StatementExportModal } from "@/components/StatementExportModal";
 import { jsPDF } from "jspdf";
+import { toast } from "sonner";
 
 export default function HistoryPage() {
     const { address: currentAddress, isConnected, isConnecting, isReconnecting } = useAccount();
@@ -15,8 +17,13 @@ export default function HistoryPage() {
 
     const [receipts, setReceipts] = useState<Receipt[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [isGeneratingReceiptId, setIsGeneratingReceiptId] = useState<string | null>(null);
+    const [isStatementModalOpen, setIsStatementModalOpen] = useState(false);
 
     const generatePDF = (receipt: Receipt) => {
+        setIsGeneratingReceiptId(receipt.id || null);
+        const toastId = toast.loading("Preparing your receipt...");
+
         const doc = new jsPDF({
             orientation: "portrait",
             unit: "mm",
@@ -28,114 +35,122 @@ export default function HistoryPage() {
         const lightColor = "#71717A"; // Zinc-400
 
         const createPDF = (qrImageData?: string) => {
-            // Background / Border
-            doc.setDrawColor(228, 228, 231); // Border color
-            doc.rect(5, 5, 200, 287);
+            try {
+                // Background / Border
+                doc.setDrawColor(228, 228, 231); // Border color
+                doc.rect(5, 5, 200, 287);
 
-            // Header
-            doc.setFillColor(darkColor);
-            doc.rect(5, 5, 200, 40, "F");
+                // Header
+                doc.setFillColor(darkColor);
+                doc.rect(5, 5, 200, 40, "F");
 
-            doc.setTextColor(255, 255, 255);
-            doc.setFontSize(24);
-            doc.setFont("helvetica", "bold");
-            doc.text("SafeVault", 15, 22);
-
-            doc.setFontSize(10);
-            doc.setFont("helvetica", "normal");
-            doc.text("DECENTRALIZED SAVINGS RECEIPT", 15, 32);
-
-            doc.setFontSize(12);
-            doc.text(`ID: ${receipt.id?.slice(0, 8).toUpperCase()}`, 160, 22);
-
-            // Content Starts
-            let y = 60;
-            doc.setTextColor(darkColor);
-            doc.setFontSize(18);
-            doc.text(receipt.purpose || "Vault Transaction", 15, y);
-            y += 10;
-
-            // Divider
-            doc.setDrawColor(primaryColor);
-            doc.setLineWidth(1);
-            doc.line(15, y, 60, y);
-            y += 15;
-
-            // Details Grid
-            doc.setFontSize(10);
-            doc.setTextColor(lightColor);
-            doc.text("TYPE", 15, y);
-            doc.text("TIMESTAMP", 70, y);
-            doc.text("STATUS", 150, y);
-
-            y += 7;
-            doc.setFontSize(12);
-            doc.setTextColor(darkColor);
-            doc.text(receipt.type.toUpperCase(), 15, y);
-            doc.text(new Date(receipt.timestamp).toLocaleString(), 70, y);
-            doc.text(receipt.verified ? "VERIFIED" : "PENDING", 150, y);
-
-            y += 20;
-            doc.setFontSize(10);
-            doc.setTextColor(lightColor);
-            doc.text("AMOUNT", 15, y);
-            if (receipt.penalty) doc.text("PENALTY APPLIED", 70, y);
-
-            y += 7;
-            doc.setFontSize(16);
-            doc.setFont("helvetica", "bold");
-            doc.setTextColor(primaryColor);
-            doc.text(`${receipt.amount} USDT0`, 15, y);
-            if (receipt.penalty) {
-                doc.setTextColor("#EF4444"); // Red-500
-                doc.text(`${receipt.penalty} USDT0`, 70, y);
-            }
-
-            y += 25;
-            // Blockchain Info Card
-            doc.setFillColor(244, 244, 245); // Zinc-100
-            doc.rect(15, y - 5, 180, 45, "F");
-
-            doc.setFontSize(10);
-            doc.setTextColor(lightColor);
-            doc.text("BLOCKCHAIN PROOF", 22, y + 5);
-
-            doc.setFontSize(9);
-            doc.setFont("courier", "normal");
-            doc.setTextColor(darkColor);
-            doc.text(`WALLET: ${receipt.walletAddress}`, 22, y + 15);
-            const truncatedHash = receipt.txHash.length > 50 ? receipt.txHash.slice(0, 50) + "..." : receipt.txHash;
-            doc.text(`TX HASH: ${truncatedHash}`, 22, y + 25);
-            doc.text(`NETWORK: Flare Coston2`, 22, y + 35);
-
-            y += 60;
-            // ProofRails Section
-            if (receipt.proofRailsId) {
+                doc.setTextColor(255, 255, 255);
+                doc.setFontSize(24);
                 doc.setFont("helvetica", "bold");
+                doc.text("SafeVault", 15, 22);
+
+                doc.setFontSize(10);
+                doc.setFont("helvetica", "normal");
+                doc.text("DECENTRALIZED SAVINGS RECEIPT", 15, 32);
+
+                doc.setFontSize(12);
+                doc.text(`ID: ${receipt.id?.slice(0, 8).toUpperCase()}`, 160, 22);
+
+                // Content Starts
+                let y = 60;
+                doc.setTextColor(darkColor);
+                doc.setFontSize(18);
+                doc.text(receipt.purpose || "Vault Transaction", 15, y);
+                y += 10;
+
+                // Divider
+                doc.setDrawColor(primaryColor);
+                doc.setLineWidth(1);
+                doc.line(15, y, 60, y);
+                y += 15;
+
+                // Details Grid
+                doc.setFontSize(10);
+                doc.setTextColor(lightColor);
+                doc.text("TYPE", 15, y);
+                doc.text("TIMESTAMP", 70, y);
+                doc.text("STATUS", 150, y);
+
+                y += 7;
                 doc.setFontSize(12);
                 doc.setTextColor(darkColor);
-                doc.text("ProofRails Verification", 15, y);
+                doc.text(receipt.type.toUpperCase(), 15, y);
+                doc.text(new Date(receipt.timestamp).toLocaleString(), 70, y);
+                doc.text(receipt.verified ? "VERIFIED" : "PENDING", 150, y);
 
-                doc.setFont("helvetica", "normal");
-                doc.setFontSize(9);
+                y += 20;
+                doc.setFontSize(10);
                 doc.setTextColor(lightColor);
-                doc.text(`Receipt ID: ${receipt.proofRailsId}`, 15, y + 7);
+                doc.text("AMOUNT", 15, y);
+                if (receipt.penalty) doc.text("PENALTY APPLIED", 70, y);
 
-                if (qrImageData) {
-                    doc.addImage(qrImageData, "PNG", 150, y - 5, 35, 35);
+                y += 7;
+                doc.setFontSize(16);
+                doc.setFont("helvetica", "bold");
+                doc.setTextColor(primaryColor);
+                doc.text(`${receipt.amount} USDT0`, 15, y);
+                if (receipt.penalty) {
+                    doc.setTextColor("#EF4444"); // Red-500
+                    doc.text(`${receipt.penalty} USDT0`, 70, y);
                 }
 
-                doc.setTextColor(primaryColor);
-                doc.text("Scan to verify on-chain authenticity", 15, y + 15);
+                y += 25;
+                // Blockchain Info Card
+                doc.setFillColor(244, 244, 245); // Zinc-100
+                doc.rect(15, y - 5, 180, 45, "F");
+
+                doc.setFontSize(10);
+                doc.setTextColor(lightColor);
+                doc.text("BLOCKCHAIN PROOF", 22, y + 5);
+
+                doc.setFontSize(9);
+                doc.setFont("courier", "normal");
+                doc.setTextColor(darkColor);
+                doc.text(`WALLET: ${receipt.walletAddress}`, 22, y + 15);
+                const truncatedHash = receipt.txHash.length > 50 ? receipt.txHash.slice(0, 50) + "..." : receipt.txHash;
+                doc.text(`TX HASH: ${truncatedHash}`, 22, y + 25);
+                doc.text(`NETWORK: Flare Coston2`, 22, y + 35);
+
+                y += 60;
+                // ProofRails Section
+                if (receipt.proofRailsId) {
+                    doc.setFont("helvetica", "bold");
+                    doc.setFontSize(12);
+                    doc.setTextColor(darkColor);
+                    doc.text("ProofRails Verification", 15, y);
+
+                    doc.setFont("helvetica", "normal");
+                    doc.setFontSize(9);
+                    doc.setTextColor(lightColor);
+                    doc.text(`Receipt ID: ${receipt.proofRailsId}`, 15, y + 7);
+
+                    if (qrImageData) {
+                        doc.addImage(qrImageData, "PNG", 150, y - 5, 35, 35);
+                    }
+
+                    doc.setTextColor(primaryColor);
+                    doc.text("Scan to verify on-chain authenticity", 15, y + 15);
+                }
+
+                // Footer
+                doc.setFontSize(8);
+                doc.setTextColor(lightColor);
+                doc.text("This receipt is cryptographically generated and verified by the ProofRails protocol.", 105, 280, { align: "center" });
+                doc.text("Visit safevault.app for more info.", 105, 285, { align: "center" });
+
+                doc.save(`SafeVault-Receipt-${receipt.id?.slice(0, 8)}.pdf`);
+                toast.success("Receipt downloaded!", { id: toastId });
+            } catch (error) {
+                console.error("PDF generation failed", error);
+                toast.error("Generation failed", { id: toastId });
+            } finally {
+                setIsGeneratingReceiptId(null);
             }
-
-            // Footer
-            doc.setFontSize(8);
-            doc.setTextColor(lightColor);
-            doc.text("This receipt is cryptographically generated and verified by the ProofRails protocol.", 105, 280, { align: "center" });
-            doc.text("Visit safevault.app for more info.", 105, 285, { align: "center" });
-
-            doc.save(`SafeVault-Receipt-${receipt.id?.slice(0, 8)}.pdf`);
         };
 
         if (receipt.proofRailsId) {
@@ -151,7 +166,10 @@ export default function HistoryPage() {
                 const dataURL = canvas.toDataURL("image/png");
                 createPDF(dataURL);
             };
-            img.onerror = () => createPDF();
+            img.onerror = () => {
+                console.warn("QR loader error");
+                createPDF();
+            };
         } else {
             createPDF();
         }
@@ -206,10 +224,32 @@ export default function HistoryPage() {
 
     return (
         <div className="space-y-8">
-            <div>
-                <h1 className="text-3xl font-bold text-white mb-2">Transaction History</h1>
-                <p className="text-gray-400">View your ProofRails verified transaction receipts</p>
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-3xl font-bold text-white mb-2">Transaction History</h1>
+                    <p className="text-gray-400">View your ProofRails verified transaction receipts</p>
+                </div>
+
+                {receipts.length > 0 && (
+                    <Button
+                        onClick={() => setIsStatementModalOpen(true)}
+                        className="gap-2 bg-primary hover:bg-primary/90"
+                    >
+                        <FileText className="w-4 h-4" />
+                        Export Statement
+                    </Button>
+                )}
             </div>
+
+            {/* Statement Export Modal */}
+            {currentAddress && (
+                <StatementExportModal
+                    isOpen={isStatementModalOpen}
+                    onClose={() => setIsStatementModalOpen(false)}
+                    receipts={receipts}
+                    walletAddress={currentAddress}
+                />
+            )}
 
             {isLoading ? (
                 <div className="grid grid-cols-1 gap-4">
@@ -296,9 +336,14 @@ export default function HistoryPage() {
                                                 size="sm"
                                                 variant="ghost"
                                                 onClick={() => generatePDF(receipt)}
+                                                disabled={isGeneratingReceiptId === receipt.id}
                                                 className="gap-2 text-zinc-400 hover:text-white"
                                             >
-                                                <Download className="w-3 h-3" />
+                                                {isGeneratingReceiptId === receipt.id ? (
+                                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                                ) : (
+                                                    <Download className="w-3 h-3" />
+                                                )}
                                                 PDF
                                             </Button>
 
