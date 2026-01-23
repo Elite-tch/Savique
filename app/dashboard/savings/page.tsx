@@ -101,7 +101,7 @@ function VaultCard({ address }: { address: `0x${string}` }) {
                     setCreationDate(new Date(creationReceipt.timestamp));
                 }
             } catch (error) {
-                console.error('[VaultCard] Error fetching creation date:', error);
+                console.error('[SavingsCard] Error fetching creation date:', error);
             }
         };
 
@@ -127,7 +127,7 @@ function VaultCard({ address }: { address: `0x${string}` }) {
 
     return (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-            <Link href={`/dashboard/vaults/${address}`}>
+            <Link href={`/dashboard/savings/${address}`}>
                 <Card className="hover:border-primary/50 transition-all cursor-pointer group h-full">
                     <div className="p-3 space-y-4">
                         <div className="flex justify-end items-start">

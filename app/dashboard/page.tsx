@@ -237,7 +237,7 @@ export default function Dashboard() {
             isPrivacy: true
         },
         {
-            label: "Active Vaults",
+            label: "Active Savings",
             value: calculatedActiveCount.toString(),
             icon: Lock,
             color: "text-primary",
@@ -251,7 +251,7 @@ export default function Dashboard() {
             isPrivacy: true
         },
         {
-            label: "Completed Vaults",
+            label: "Completed Savings",
             value: calculatedCompletedCount.toString(),
             icon: CheckCircle,
             color: "text-primary",
@@ -266,7 +266,7 @@ export default function Dashboard() {
                     <Wallet className="w-16 h-16 text-gray-500 mx-auto mb-4" />
                     <h2 className="text-2xl font-bold text-white mb-2">Connect Your Wallet</h2>
                     <p className="text-gray-400">
-                        Please connect your wallet to view your dashboard and manage your vaults.
+                        Please connect your wallet to view your dashboard and manage your savings.
                     </p>
                 </Card>
             </div>
@@ -298,16 +298,16 @@ export default function Dashboard() {
 
             {/* Action Row */}
             <div className="flex justify-between md:flex-row flex-col gap-3 md:items-center">
-                <h2 className="text-2xl font-bold text-white">Recent Vaults</h2>
+                <h2 className="text-2xl font-bold text-white">Recent Savings</h2>
                 <div className="flex gap-4 items-center">
-                    <Link href="/dashboard/vaults">
+                    <Link href="/dashboard/savings">
                         <Button variant="ghost" className="text-gray-400 hover:text-white">
                             View All
                         </Button>
                     </Link>
                     <Link href="/dashboard/create">
                         <Button className="gap-2 bg-primary text-white hover:bg-primary/90">
-                            <Plus className="w-4 h-4" /> Create New Vault
+                            <Plus className="w-4 h-4" /> Create New Savings
                         </Button>
                     </Link>
                 </div>
@@ -326,9 +326,9 @@ export default function Dashboard() {
                         <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-4">
                             <Lock className="w-8 h-8 text-gray-500" />
                         </div>
-                        <h3 className="text-lg font-medium text-white">No Active Vaults</h3>
+                        <h3 className="text-lg font-medium text-white">No Active Savings</h3>
                         <p className="text-gray-400 mb-6 max-w-sm">
-                            You don't have any active savings plans yet. Start by creating a personal vault.
+                            You don't have any active savings plans yet. Start by creating a personal savings.
                         </p>
                         <Link href="/dashboard/create">
                             <Button variant="outline" className="border-white/20 hover:bg-white/10">Get Started</Button>

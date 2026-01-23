@@ -89,7 +89,7 @@ export function VaultBreakModal({
                         amount: amountToReceive,
                         from: address, // Vault
                         to: receipt.from, // User (initiator)
-                        purpose: `Vault Broken: ${purpose}`,
+                        purpose: `Savings Broken: ${purpose}`,
                         transactionHash: receipt.transactionHash
                     });
 
@@ -99,7 +99,7 @@ export function VaultBreakModal({
                         vaultAddress: address,
                         txHash: receipt.transactionHash,
                         timestamp: Date.now(),
-                        purpose: purpose || "Vault Broken",
+                        purpose: purpose || "Savings Broken",
                         amount: amountToReceive.toFixed(2),
                         penalty: penaltyAmount.toFixed(2),
                         type: 'breaked',
@@ -110,7 +110,7 @@ export function VaultBreakModal({
                     // Notify user
                     await createNotification(
                         userAddress!,
-                        "Vault Broken & Verified",
+                        "Savings Broken & Verified",
                         `You broke "${purpose}" early. Your digital receipt is verified. Penalty applied.`,
                         'warning',
                         '/dashboard/history',
@@ -119,7 +119,7 @@ export function VaultBreakModal({
 
                     toast.success("Receipt Generated", toastStyle);
                     onClose();
-                    router.push("/dashboard/vaults");
+                    router.push("/dashboard/savings");
                 } catch (error) {
                     console.error("Failed to generate receipt:", error);
                     toast.error("Receipt Generation Failed", toastStyle);
@@ -130,7 +130,7 @@ export function VaultBreakModal({
                         vaultAddress: address,
                         txHash: receipt.transactionHash,
                         timestamp: Date.now(),
-                        purpose: purpose || "Vault Broken",
+                        purpose: purpose || "Savings Broken",
                         amount: amountToReceive.toFixed(2),
                         penalty: penaltyAmount.toFixed(2),
                         type: 'breaked',
@@ -140,14 +140,14 @@ export function VaultBreakModal({
                     // Notify user even on error
                     await createNotification(
                         userAddress!,
-                        "Vault Broken - Receipt Pending",
-                        `Vault "${purpose}" broken successfully. Funds transferred, receipt will verify automatically soon.`,
+                        "Savings Broken - Receipt Pending",
+                        `Savings "${purpose}" broken successfully. Funds transferred, receipt will verify automatically soon.`,
                         'info',
                         '/dashboard/history'
                     );
 
                     onClose();
-                    router.push("/dashboard/vaults");
+                    router.push("/dashboard/savings");
                 }
             };
 

@@ -47,7 +47,7 @@ export default function HistoryPage() {
                 doc.setTextColor(255, 255, 255);
                 doc.setFontSize(24);
                 doc.setFont("helvetica", "bold");
-                doc.text("SafeVault", 15, 22);
+                doc.text("Safira", 15, 22);
 
                 doc.setFontSize(10);
                 doc.setFont("helvetica", "normal");
@@ -60,7 +60,7 @@ export default function HistoryPage() {
                 let y = 60;
                 doc.setTextColor(darkColor);
                 doc.setFontSize(18);
-                doc.text(receipt.purpose || "Vault Transaction", 15, y);
+                doc.text(receipt.purpose || "Saving Transaction", 15, y);
                 y += 10;
 
                 // Divider
@@ -141,9 +141,9 @@ export default function HistoryPage() {
                 doc.setFontSize(8);
                 doc.setTextColor(lightColor);
                 doc.text("This receipt is cryptographically generated and verified by the ProofRails protocol.", 105, 280, { align: "center" });
-                doc.text("Visit safevault.app for more info.", 105, 285, { align: "center" });
+                doc.text("Visit safira.app for more info.", 105, 285, { align: "center" });
 
-                doc.save(`SafeVault-Receipt-${receipt.id?.slice(0, 8)}.pdf`);
+                doc.save(`Safira-Receipt-${receipt.id?.slice(0, 8)}.pdf`);
                 toast.success("Receipt downloaded!", { id: toastId });
             } catch (error) {
                 console.error("PDF generation failed", error);
@@ -215,7 +215,7 @@ export default function HistoryPage() {
                     <Wallet className="w-16 h-16 text-gray-500 mx-auto mb-4" />
                     <h2 className="text-2xl font-bold text-white mb-2">Connect Your Wallet</h2>
                     <p className="text-gray-400">
-                        Please connect your wallet to view your dashboard and manage your vaults.
+                        Please connect your wallet to view your dashboard and manage your savings.
                     </p>
                 </Card>
             </div>
@@ -224,7 +224,7 @@ export default function HistoryPage() {
 
     return (
         <div className="space-y-8">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between md:flex-row flex-col gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-white mb-2">Transaction History</h1>
                     <p className="text-gray-400">View your ProofRails verified transaction receipts</p>
@@ -233,7 +233,7 @@ export default function HistoryPage() {
                 {receipts.length > 0 && (
                     <Button
                         onClick={() => setIsStatementModalOpen(true)}
-                        className="gap-2 bg-primary hover:bg-primary/90"
+                        className="gap-2 bg-primary hover:bg-primary/90 w-fit md:w-auto"
                     >
                         <FileText className="w-4 h-4" />
                         Export Statement
@@ -266,7 +266,7 @@ export default function HistoryPage() {
                     </div>
                     <h3 className="text-xl font-medium text-white mb-2">No Receipts Yet</h3>
                     <p className="text-gray-400 max-w-sm mx-auto">
-                        Create your first vault to start generating verified ProofRails receipts
+                        Create your first savings to start generating verified ProofRails receipts
                     </p>
                 </Card>
             ) : (

@@ -91,7 +91,7 @@ export default function CreatePersonalVault() {
                     toast.success("USDT Approved!", toastStyle);
 
                     // Start next step
-                    toastId.current = toast.loading("Creating & Funding Vault...", toastStyle);
+                    toastId.current = toast.loading("Creating & Funding Savings...", toastStyle);
                     setTxHash(undefined);
                     setCurrentStep('creating');
                     triggerCreateVault();
@@ -132,13 +132,13 @@ export default function CreatePersonalVault() {
 
                         if (newVault) {
                             setCreatedVaultAddress(newVault as `0x${string}`);
-                            toast.success("Vault Created & Funded!", toastStyle);
+                            toast.success("Savings Created & Funded!", toastStyle);
                             setTxHash(undefined);
                             setCurrentStep('generating_proof');
                             // Pass address directly to avoid state race condition
                             handleProofGeneration(receipt.transactionHash, newVault);
                         } else {
-                            throw new Error("Could not find new vault address");
+                            throw new Error("Could not find new savings address");
                         }
                     } catch (e) {
                         console.error("Error finding new vault:", e);
@@ -236,7 +236,7 @@ export default function CreatePersonalVault() {
                 createdAt: Date.now(),
                 purpose: formData.purpose
             });
-            console.log("✅ Vault saved to registry");
+            console.log("✅ Savings saved to registry");
 
 
         } catch (dbError) {
@@ -252,7 +252,7 @@ export default function CreatePersonalVault() {
                 amount: parseFloat(formData.amount),
                 from: address!,
                 to: targetVault,
-                purpose: `SafeVault: ${formData.purpose}`,
+                purpose: `Safira: ${formData.purpose}`,
                 transactionHash: txHashStr
             });
 
@@ -261,10 +261,10 @@ export default function CreatePersonalVault() {
             // Notify User
             await createNotification(
                 address!,
-                "Vault Created & Verified",
-                `Your vault "${formData.purpose}" has been secured and your digital receipt is verified.`,
+                "Savings Created & Verified",
+                `Your Savings "${formData.purpose}" has been secured and your digital receipt is verified.`,
                 'success',
-                `/dashboard/vaults/${targetVault}`,
+                `/dashboard/savings/${targetVault}`,
                 receiptResult.id
             );
 
@@ -283,7 +283,7 @@ export default function CreatePersonalVault() {
 
             setCurrentStep('done');
             toast.success("All Done! Vault Created.", toastStyle);
-            setTimeout(() => router.push("/dashboard/vaults"), 1500);
+            setTimeout(() => router.push("/dashboard/savings"), 1500);
         } catch (e: any) {
             console.error("❌ Proof generation failed:", e);
 
@@ -302,15 +302,15 @@ export default function CreatePersonalVault() {
             // Notify user even on error
             await createNotification(
                 address!,
-                "Vault Created - Receipt Pending",
-                `Your vault "${formData.purpose}" is active, but your digital receipt is still processing. It will verify automatically soon.`,
+                "Savings Created - Receipt Pending",
+                `Your Savings "${formData.purpose}" is active, but your digital receipt is still processing. It will verify automatically soon.`,
                 'info',
-                `/dashboard/vaults/${targetVault}`
+                `/dashboard/savings/${targetVault}`
             );
 
             toast.error("Receipt Gen Failed but Vault Created", toastStyle);
             setCurrentStep('done');
-            setTimeout(() => router.push("/dashboard/vaults"), 2000);
+            setTimeout(() => router.push("/dashboard/savings"), 2000);
         }
     };
 

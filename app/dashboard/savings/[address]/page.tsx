@@ -133,7 +133,7 @@ export default function VaultDetailPage() {
                         amount: parseFloat(amountToSave),
                         from: address, // Vault
                         to: receipt.from, // User
-                        purpose: `Vault Withdrawal: ${purpose}`,
+                        purpose: `Savings Withdrawal: ${purpose}`,
                         transactionHash: receipt.transactionHash
                     });
 
@@ -143,7 +143,7 @@ export default function VaultDetailPage() {
                         vaultAddress: address,
                         txHash: receipt.transactionHash,
                         timestamp: Date.now(),
-                        purpose: purpose || "Vault Withdrawal",
+                        purpose: purpose || "Savings Withdrawal",
                         amount: parseFloat(amountToSave).toFixed(2),
                         type: 'completed',
                         verified: !!receiptResult?.id,
@@ -154,14 +154,14 @@ export default function VaultDetailPage() {
                     await createNotification(
                         userAddress!,
                         "Withdrawal & Receipt Verified",
-                        `Successfully withdrew funds from your "${purpose}" vault. Your digital receipt has been verified.`,
+                        `Successfully withdrew funds from your "${purpose}" savings. Your digital receipt has been verified.`,
                         'success',
                         '/dashboard/history',
                         receiptResult?.id
                     );
 
                     toast.success("Receipt Generated", toastStyle);
-                    router.push("/dashboard/vaults");
+                    router.push("/dashboard/savings");
                 } catch (error) {
                     console.error("Failed to generate receipt:", error);
                     toast.error("Receipt Generation Failed", toastStyle);
@@ -172,7 +172,7 @@ export default function VaultDetailPage() {
                         vaultAddress: address,
                         txHash: receipt.transactionHash,
                         timestamp: Date.now(),
-                        purpose: purpose || "Vault Withdrawal",
+                        purpose: purpose || "Savings Withdrawal",
                         amount: parseFloat(amountToSave).toFixed(2),
                         type: 'completed',
                         verified: false
@@ -187,7 +187,7 @@ export default function VaultDetailPage() {
                         '/dashboard/history'
                     );
 
-                    router.push("/dashboard/vaults");
+                    router.push("/dashboard/savings");
                 }
             };
             generateReceipt();
@@ -229,7 +229,7 @@ export default function VaultDetailPage() {
         <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in duration-500">
             {/* Header */}
             <div className="flex items-center gap-4">
-                <Link href="/dashboard/vaults">
+                <Link href="/dashboard/savings">
                     <Button variant="ghost" size="icon" className="rounded-full hover:bg-white/10">
                         <ArrowLeft className="w-5 h-5 text-gray-400" />
                     </Button>
@@ -319,6 +319,10 @@ export default function VaultDetailPage() {
                             >
                                 <AlertTriangle className="w-4 h-4 mr-2" />
                                 Break Vault Early
+                            </Button>
+                        ) : parseFloat(balance) <= 0 ? (
+                            <Button disabled className="w-full bg-zinc-800 text-zinc-500 border border-zinc-700/50 cursor-not-allowed">
+                                Vault Empty
                             </Button>
                         ) : (
                             <Button

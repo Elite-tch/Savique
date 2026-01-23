@@ -22,7 +22,7 @@ export default function LandingPage() {
                             />
                         </div>
                         <span className="text-xl font-bold font-display bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
-                            SafeVault
+                            Safira
                         </span>
                     </div>
 
@@ -36,7 +36,7 @@ export default function LandingPage() {
             </header>
 
             {/* Hero Section */}
-            <main className="flex-1 pt-32 pb-20">
+            <main className="flex-1 pt-32 md:pt-40 pb-20">
                 <div className="container mx-auto px-6 text-center">
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
@@ -52,17 +52,13 @@ export default function LandingPage() {
                             and generate verifiable financial proofs on the Flare Network.
                         </p>
 
-                        <div className="flex justify-center gap-4">
+                        <div className="flex justify-center md:flex-row flex-col gap-4">
                             <Link href="/dashboard">
                                 <Button size="lg" className="gap-2">
                                     Start Saving <ArrowRight className="w-4 h-4" />
                                 </Button>
                             </Link>
-                            <Link href="#how-it-works">
-                                <Button variant="secondary" size="lg">
-                                    Learn More
-                                </Button>
-                            </Link>
+
                         </div>
                     </motion.div>
                 </div>
@@ -117,12 +113,8 @@ export default function LandingPage() {
 
             {/* Footer */}
             <footer className="border-t border-white/5 py-8 mt-20">
-                <div className="container mx-auto px-6 flex justify-between items-center text-gray-500 text-sm">
+                <div className="container mx-auto px-6 flex justify-center items-center text-gray-500 text-sm">
                     <p>© 2025 SafeVault. Built on Flare.</p>
-                    <div className="flex gap-4">
-                        <a href="#" className="hover:text-primary">Docs</a>
-                        <a href="#" className="hover:text-primary">Terms</a>
-                    </div>
                 </div>
             </footer>
         </div>

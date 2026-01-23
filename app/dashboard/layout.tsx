@@ -79,7 +79,7 @@ function useDeadlinePulse(address?: string) {
 
 const QUOTES = [
     "Consistency is the key to financial freedom.",
-    "Small savings today, big vaults tomorrow.",
+    "Small savings today, big saves tomorrow.",
     "Your future self will thank you.",
     "Discipline is the bridge to goals.",
     "Every deposit counts.",
@@ -128,7 +128,7 @@ function SidebarContent({ pathname, onNavigate }: { pathname: string; onNavigate
                         />
                     </div>
                     <span className="text-xl font-bold font-display bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
-                        SafeVault
+                        Safira
                     </span>
                 </div>
             </Link>
@@ -144,16 +144,16 @@ function SidebarContent({ pathname, onNavigate }: { pathname: string; onNavigate
                         onClick={onNavigate}
                     />
                     <NavItem
-                        href="/dashboard/vaults"
+                        href="/dashboard/savings"
                         icon={<Lock className="w-5 h-5" />}
-                        label="My Vaults"
-                        active={pathname.startsWith("/dashboard/vaults")}
+                        label="My Savings"
+                        active={pathname.startsWith("/dashboard/savings")}
                         onClick={onNavigate}
                     />
                     <NavItem
                         href="/dashboard/create"
                         icon={<PlusCircle className="w-5 h-5" />}
-                        label="New Vault"
+                        label="Create Savings"
                         active={pathname.startsWith("/dashboard/create")}
                         onClick={onNavigate}
                     />
@@ -176,7 +176,7 @@ function SidebarContent({ pathname, onNavigate }: { pathname: string; onNavigate
 
             <div className="p-4 border-t border-white/10">
                 <div className="bg-white/5 rounded-xl p-4">
-                    <p className="text-xs text-center text-gray-500 mb-2">SafeVault v1.0</p>
+                    <p className="text-xs text-center text-gray-500 mb-2">Safira v1.0</p>
                 </div>
             </div>
         </>
