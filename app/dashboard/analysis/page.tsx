@@ -184,7 +184,7 @@ export default function AnalysisPage() {
                         <Activity className="w-5 h-5" />
                         <span className="text-xs font-bold uppercase tracking-widest">Financial Intelligence</span>
                     </div>
-                    <h1 className="text-4xl font-black text-white tracking-tight">Vault Analysis</h1>
+                    <h1 className="text-4xl font-black text-white tracking-tight">Savings Analysis</h1>
                     <p className="text-gray-400 mt-2 max-w-lg">
                         Deep dive into your savings discipline and ProofRails verified audit trail.
                     </p>
