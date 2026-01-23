@@ -224,7 +224,7 @@ export default function HistoryPage() {
 
     return (
         <div className="space-y-8">
-            <div className="flex items-center justify-between md:flex-row flex-col gap-4">
+            <div className="flex md:items-center justify-between md:flex-row flex-col gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-white mb-2">Transaction History</h1>
                     <p className="text-gray-400">View your ProofRails verified transaction receipts</p>
