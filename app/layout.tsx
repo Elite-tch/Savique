@@ -7,15 +7,15 @@ const outfit = Outfit({ subsets: ["latin"], variable: '--font-outfit' });
 const jakarta = Plus_Jakarta_Sans({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Safira | Secure Crypto Savings on Flare",
-  description: "Secure your financial future with Safira. Create purpose-driven, time-locked savings on the Flare Network. Earn verifiable receipts and build discipline.",
-  keywords: ["Safira", "Flare Network", "Crypto Savings", "Time-Locked Savings", "DeFi", "ProofRails", "Web3 Savings", "Coston2"],
-  authors: [{ name: "Safira Team" }],
+  title: "Savique | Secure Crypto Savings on Flare",
+  description: "Secure your financial future with Savique. Create purpose-driven, time-locked savings on the Flare Network. Earn verifiable receipts and build discipline.",
+  keywords: ["Savique", "Flare Network", "Crypto Savings", "Time-Locked Savings", "DeFi", "ProofRails", "Web3 Savings", "Coston2"],
+  authors: [{ name: "Savique Team" }],
   openGraph: {
-    title: "Safira | Secure Crypto Savings on Flare",
+    title: "Savique | Secure Crypto Savings on Flare",
     description: "Automated, purpose-driven savings secured by smart contracts on the Flare Network.",
     type: "website",
-    siteName: "Safira",
+    siteName: "Savique",
   },
   icons: {
     icon: "/favicon.ico",

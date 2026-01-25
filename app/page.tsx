@@ -16,13 +16,13 @@ export default function LandingPage() {
                         <div className="relative w-8 h-8 rounded-lg overflow-hidden flex-shrink-0">
                             <Image
                                 src="/logo.png"
-                                alt="SafeVault Logo"
+                                alt="Savique Logo"
                                 fill
                                 className="object-contain"
                             />
                         </div>
                         <span className="text-xl font-bold font-display bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
-                            Safira
+                            Savique
                         </span>
                     </div>
 
@@ -87,7 +87,7 @@ export default function LandingPage() {
                             <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mb-6">
                                 <Users className="w-6 h-6 text-primary" />
                             </div>
-                            <h3 className="text-xl font-bold text-white mb-3">Group Vaults</h3>
+                            <h3 className="text-xl font-bold text-white mb-3">Group Savings</h3>
                             <p className="text-gray-400">
                                 Save together without trust. Funds are locked until members vote
                                 to release them to a specific destination.
@@ -114,7 +114,7 @@ export default function LandingPage() {
             {/* Footer */}
             <footer className="border-t border-white/5 py-8 mt-20">
                 <div className="container mx-auto px-6 flex justify-center items-center text-gray-500 text-sm">
-                    <p>© 2025 SafeVault. Built on Flare.</p>
+                    <p>© 2025 Savique. Built on Flare.</p>
                 </div>
             </footer>
         </div>

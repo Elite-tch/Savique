@@ -51,10 +51,10 @@ function useDeadlinePulse(address?: string) {
                             if (!notified) {
                                 await createNotification(
                                     address,
-                                    "Vault Unlocking Soon",
-                                    `Your vault is set to unlock in less than ${Math.ceil(diffHours)} hours. Get ready!`,
+                                    "Savings Unlocking Soon",
+                                    `Your Savings is set to unlock in less than ${Math.ceil(diffHours)} hours. Get ready!`,
                                     'info',
-                                    `/dashboard/vaults/${vaultAddr}`
+                                    `/dashboard/savings/${vaultAddr}`
                                 );
                                 localStorage.setItem(key, "true");
                             }
@@ -128,7 +128,7 @@ function SidebarContent({ pathname, onNavigate }: { pathname: string; onNavigate
                         />
                     </div>
                     <span className="text-xl font-bold font-display bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
-                        Safira
+                       Savique
                     </span>
                 </div>
             </Link>
@@ -176,7 +176,7 @@ function SidebarContent({ pathname, onNavigate }: { pathname: string; onNavigate
 
             <div className="p-4 border-t border-white/10">
                 <div className="bg-white/5 rounded-xl p-4">
-                    <p className="text-xs text-center text-gray-500 mb-2">Safira v1.0</p>
+                    <p className="text-xs text-center text-gray-500 mb-2">Savique v1.0</p>
                 </div>
             </div>
         </>

@@ -47,7 +47,7 @@ export default function HistoryPage() {
                 doc.setTextColor(255, 255, 255);
                 doc.setFontSize(24);
                 doc.setFont("helvetica", "bold");
-                doc.text("Safira", 15, 22);
+                doc.text("Savique", 15, 22);
 
                 doc.setFontSize(10);
                 doc.setFont("helvetica", "normal");
@@ -143,7 +143,7 @@ export default function HistoryPage() {
                 doc.text("This receipt is cryptographically generated and verified by the ProofRails protocol.", 105, 280, { align: "center" });
                 doc.text("Visit safira.app for more info.", 105, 285, { align: "center" });
 
-                doc.save(`Safira-Receipt-${receipt.id?.slice(0, 8)}.pdf`);
+                doc.save(`Savique-Receipt-${receipt.id?.slice(0, 8)}.pdf`);
                 toast.success("Receipt downloaded!", { id: toastId });
             } catch (error) {
                 console.error("PDF generation failed", error);

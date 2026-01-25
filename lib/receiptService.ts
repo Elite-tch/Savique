@@ -192,3 +192,42 @@ export async function getUserVaultsFromDb(ownerAddress: string): Promise<string[
         return [];
     }
 }
+
+/**
+ * Get ALL vaults for Admin Dashboard
+ */
+export async function getAllVaults(): Promise<SavedVault[]> {
+    try {
+        const vaultsRef = collection(db, VAULTS_COLLECTION);
+        const q = query(vaultsRef, orderBy('createdAt', 'desc'));
+
+        const querySnapshot = await getDocs(q);
+        const vaults: SavedVault[] = [];
+
+        querySnapshot.forEach((doc) => {
+            const data = doc.data();
+            // Map Firestore Timestamp to number if needed, or keep as is.
+            // SavedVault interface says createdAt is number.
+            // But we saved it as Timestamp.now() in saveVault.
+            // Let's handle both.
+            let created = data.createdAt;
+            if (created && typeof created.toMillis === 'function') {
+                created = created.toMillis();
+            }
+
+            vaults.push({
+                vaultAddress: data.vaultAddress,
+                owner: data.owner,
+                factoryAddress: data.factoryAddress,
+                createdAt: created || Date.now(),
+                purpose: data.purpose
+            });
+        });
+
+        console.log(`[Admin] Loaded ${vaults.length} total vaults`);
+        return vaults;
+    } catch (error) {
+        console.error('[Admin] Error fetching all vaults:', error);
+        return [];
+    }
+}

@@ -369,7 +369,7 @@ export default function CreatePersonalVault() {
                 <div className="md:col-span-2">
                     <Card className="p-8">
                         <div className="mb-8">
-                            <h2 className="text-3xl font-bold text-white mb-2">Create USDT0 Vault</h2>
+                            <h2 className="text-3xl font-bold text-white mb-2">Create USDT0 Savings</h2>
                             <p className="text-gray-400">Lock your USDT0 with time-based penalties to enforce savings discipline</p>
                         </div>
 

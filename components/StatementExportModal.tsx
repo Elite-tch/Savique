@@ -109,7 +109,7 @@ export function StatementExportModal({ isOpen, onClose, receipts, walletAddress 
                     startDate,
                     endDate
                 });
-                const filename = `SafeVault-Statement-${startDate.toISOString().split('T')[0]}-to-${endDate.toISOString().split('T')[0]}.csv`;
+                const filename = `Savique-Statement-${startDate.toISOString().split('T')[0]}-to-${endDate.toISOString().split('T')[0]}.csv`;
                 downloadCSV(csv, filename);
             }
 

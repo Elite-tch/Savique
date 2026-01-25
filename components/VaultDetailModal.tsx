@@ -78,7 +78,7 @@ export function VaultDetailModal({
                                 {isLocked ? <Lock className="w-5 h-5 text-orange-500" /> : <Unlock className="w-5 h-5 text-green-500" />}
                                 {purpose}
                             </h2>
-                            <p className="text-sm text-zinc-400">Vault Details & Management</p>
+                            <p className="text-sm text-zinc-400">Savings Details & Management</p>
                         </div>
 
                         <div className="space-y-6 mb-8">
@@ -123,7 +123,7 @@ export function VaultDetailModal({
                                     className="w-full gap-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20"
                                 >
                                     <AlertTriangle className="w-4 h-4" />
-                                    Break Vault (Preview Penalty)
+                                    Break Savings (Preview Penalty)
                                 </Button>
                             ) : (
                                 <Button
@@ -145,9 +145,9 @@ export function VaultDetailModal({
                             <div className="mx-auto w-12 h-12 bg-red-500/10 rounded-full flex items-center justify-center mb-4">
                                 <AlertTriangle className="w-6 h-6 text-red-500" />
                             </div>
-                            <h2 className="text-xl font-bold text-red-500 mb-2">Break Vault Warning</h2>
+                            <h2 className="text-xl font-bold text-red-500 mb-2">Break Savings Warning</h2>
                             <p className="text-sm text-zinc-400">
-                                Are you sure you want to break this vault before the unlock date?
+                                Are you sure you want to break this savings before the unlock date?
                             </p>
                         </div>
 
