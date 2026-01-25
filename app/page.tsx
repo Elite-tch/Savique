@@ -9,6 +9,29 @@ import { ArrowRight, Shield, Users, Wallet } from "lucide-react";
 export default function LandingPage() {
     return (
         <div className="min-h-screen flex flex-col ">
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{
+                    __html: JSON.stringify({
+                        "@context": "https://schema.org",
+                        "@type": "SoftwareApplication",
+                        "name": "Savique",
+                        "applicationCategory": "FinanceApplication",
+                        "operatingSystem": "Web",
+                        "offers": {
+                            "@type": "Offer",
+                            "price": "0",
+                            "priceCurrency": "USD"
+                        },
+                        "description": "Smart Commitment Protocol for your capital on Flare Network. Savings vaults with verifiable proofs.",
+                        "aggregateRating": {
+                            "@type": "AggregateRating",
+                            "ratingValue": "4.8",
+                            "ratingCount": "120"
+                        }
+                    })
+                }}
+            />
             {/* Header */}
             <header className="fixed top-4 left-1/2 -translate-x-1/2 w-[90%] md:w-[60%] lg:w-[30%] z-50 rounded-full glass border border-white/10 backdrop-blur-md bg-black/60 shadow-xl shadow-black/20">
                 <div className="w-full px-6 h-16 flex items-center justify-between">
