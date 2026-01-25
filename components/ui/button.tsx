@@ -10,7 +10,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 interface ButtonProps extends HTMLMotionProps<"button"> {
-    variant?: "primary" | "secondary" | "ghost" | "outline";
+    variant?: "primary" | "secondary" | "ghost" | "outline" | "destructive";
     size?: "sm" | "md" | "lg" | "icon";
 }
 
@@ -21,6 +21,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
             secondary: "bg-secondary text-white border border-border hover:bg-accent",
             ghost: "bg-transparent hover:bg-white/5 text-gray-300 hover:text-white",
             outline: "border border-primary/50 text-primary hover:bg-primary/10",
+            destructive: "bg-red-600 text-white hover:bg-red-700 shadow-md",
         };
 
         const sizes = {
