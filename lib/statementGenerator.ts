@@ -6,6 +6,7 @@ interface StatementData {
     walletAddress: string;
     startDate: Date;
     endDate: Date;
+    qrImageData?: string;
 }
 
 export function generateStatement(data: StatementData) {
@@ -40,8 +41,23 @@ export function generateStatement(data: StatementData) {
     const statementId = `ST${Date.now().toString().slice(-8)}`;
     doc.text(`Statement ID: ${statementId}`, 130, 22);
 
+    // Verified Seal (Professional Badge) - Placed under Statement ID
+    doc.setFillColor(primaryColor);
+    doc.roundedRect(130, 26, 30, 8, 1, 1, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7);
+    doc.text("VERIFIED", 145, 30.8, { align: "center" }); // Centered vertically
+    doc.setFontSize(4.5); // Slightly larger for readability
+    doc.text("BY PROOFRAILS", 145, 33.0, { align: "center" }); // Centered vertically
+
+
+
     // Account Info Section
     let y = 60;
+    if (data.qrImageData) {
+        doc.addImage(data.qrImageData, "PNG", 160, 48, 35, 35);
+    }
     doc.setTextColor(darkColor);
     doc.setFontSize(10);
     doc.setTextColor(lightColor);
@@ -97,7 +113,7 @@ export function generateStatement(data: StatementData) {
     doc.setFontSize(8);
 
     data.receipts.forEach((receipt, index) => {
-        if (y > 250) {
+        if (y > 230) {
             doc.addPage();
             y = 20;
         }
@@ -121,7 +137,7 @@ export function generateStatement(data: StatementData) {
         // Alternate row background
         if (index % 2 === 0) {
             doc.setFillColor(250, 250, 250);
-            const rowHeight = receipt.penalty ? 10 : 6;
+            const rowHeight = receipt.penalty ? 14 : 10;
             doc.rect(15, y - 4, 180, rowHeight, "F");
         }
 
@@ -146,15 +162,20 @@ export function generateStatement(data: StatementData) {
         doc.setTextColor(receipt.type === 'created' ? "#16A34A" : darkColor);
         doc.text(`${sign}${amount.toFixed(2)}`, 190, y, { align: "right" });
 
+        // Add Transaction Hash (Identity Anchor)
+        y += 4;
+        doc.setFontSize(6);
+        doc.setTextColor(lightColor);
+        doc.text(`Identity Anchor: ${receipt.txHash}`, 20, y);
+
         if (receipt.penalty) {
-            y += 4;
             doc.setFontSize(7);
             doc.setTextColor("#DC2626");
             doc.text(`(Penalty: ${parseFloat(receipt.penalty).toFixed(2)})`, 190, y, { align: "right" });
-            doc.setFontSize(8);
         }
 
-        y += receipt.penalty ? 10 : 7;
+        y += 8;
+        doc.setFontSize(8);
     });
 
     y += 10;
@@ -195,13 +216,19 @@ export function generateStatement(data: StatementData) {
     // Footer
     doc.setFontSize(8);
     doc.setTextColor(lightColor);
-    doc.text("This statement is cryptographically generated and verified by the ProofRails protocol.", 105, 280, { align: "center" });
-    doc.text("Visit safevault.app for more info.", 105, 285, { align: "center" });
+    doc.setFont("helvetica", "bold");
+    doc.text("OFFICIAL PROOFRAILS VERIFICATION", 105, 275, { align: "center" });
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7);
+    doc.text("This document serves as a cryptographically anchored proof of transaction. Authenticity can be verified", 105, 280, { align: "center" });
+    doc.text("by cross-referencing the Identity Anchors listed above with the Flare Coston2 blockchain ledger.", 105, 284, { align: "center" });
+    doc.text("Secured by Savique Protocol", 105, 288, { align: "center" });
 
     // Generate filename
-    const filename = `SafeVault-Statement-${data.startDate.toISOString().split('T')[0]}-to-${data.endDate.toISOString().split('T')[0]}.pdf`;
+    const filename = `Savique-Verified-Statement-${data.startDate.toISOString().split('T')[0]}.pdf`;
     doc.save(filename);
 }
+
 
 export function generateStatementCSV(data: StatementData): string {
     let csv = "Date,Type,Purpose,Amount (USDT0),Penalty (USDT0),Status,Transaction Hash\n";

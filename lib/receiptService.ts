@@ -231,3 +231,30 @@ export async function getAllVaults(): Promise<SavedVault[]> {
         return [];
     }
 }
+
+/**
+ * Get ALL receipts for Admin Metrics
+ */
+export async function getAllReceipts(): Promise<Receipt[]> {
+    try {
+        const receiptsRef = collection(db, RECEIPTS_COLLECTION);
+        const q = query(receiptsRef, orderBy('timestamp', 'desc'));
+
+        const querySnapshot = await getDocs(q);
+        const receipts: Receipt[] = [];
+
+        querySnapshot.forEach((doc) => {
+            const data = doc.data();
+            receipts.push({
+                id: doc.id,
+                ...data
+            } as Receipt);
+        });
+
+        return receipts;
+    } catch (error) {
+        console.error('[Admin] Error fetching all receipts:', error);
+        return [];
+    }
+}
+
