@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Shield, Users, Wallet } from "lucide-react";
+import { ArrowRight, Lightbulb, Shield, Users, Wallet } from "lucide-react";
 
 export default function LandingPage() {
     return (
@@ -34,6 +34,7 @@ export default function LandingPage() {
             />
             {/* Header */}
             <header className="fixed top-4 left-1/2 -translate-x-1/2 w-[90%] md:w-[60%] lg:w-[30%] z-50 rounded-full glass border border-white/10 backdrop-blur-md bg-black/60 shadow-xl shadow-black/20">
+
                 <div className="w-full px-6 h-16 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <div className="relative w-8 h-8 rounded-lg overflow-hidden flex-shrink-0">
@@ -84,6 +85,7 @@ export default function LandingPage() {
 
                         </div>
                     </motion.div>
+                   
                 </div>
 
                 {/* Features / Why Grid */}

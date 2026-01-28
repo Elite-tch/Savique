@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { Shield, LayoutDashboard, PlusCircle, History, LogOut, Wallet, User, Lock, Menu, X, BarChart3 } from "lucide-react";
+import { Shield, LayoutDashboard, PlusCircle, History, LogOut, Wallet, User, Lock, Menu, X, BarChart3, Lightbulb } from "lucide-react";
 import { useDisconnect, useAccount } from "wagmi";
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 
@@ -128,7 +128,7 @@ function SidebarContent({ pathname, onNavigate }: { pathname: string; onNavigate
                         />
                     </div>
                     <span className="text-xl font-bold font-display bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
-                       Savique
+                        Savique
                     </span>
                 </div>
             </Link>
@@ -169,6 +169,13 @@ function SidebarContent({ pathname, onNavigate }: { pathname: string; onNavigate
                         icon={<BarChart3 className="w-5 h-5" />}
                         label="Analysis"
                         active={pathname.startsWith("/dashboard/analysis")}
+                        onClick={onNavigate}
+                    />
+                    <NavItem
+                        href="/dashboard/tips"
+                        icon={<Lightbulb className="w-5 h-5" />}
+                        label="Savings Tips"
+                        active={pathname.startsWith("/dashboard/tips")}
                         onClick={onNavigate}
                     />
                 </div>
@@ -281,6 +288,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <main className="flex-1 p-4 md:p-8 overflow-x-hidden">
                     <div className="max-w-7xl mx-auto w-full">
                         {children}
+                       
                     </div>
                 </main>
 

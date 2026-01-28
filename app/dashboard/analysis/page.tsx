@@ -21,7 +21,12 @@ import {
     X,
     LayoutGrid,
     Activity,
-    Shield
+    Shield,
+    Zap,
+    Rocket,
+    Clock,
+    Flame,
+    Lightbulb
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAccount } from "wagmi";
@@ -144,6 +149,25 @@ export default function AnalysisPage() {
         { name: 'Breaked', value: receipts.filter(r => r.type === 'breaked').length },
     ], [receipts]);
 
+    const resilienceScore = useMemo(() => {
+        const completed = receipts.filter(r => r.type === 'completed').length;
+        const broken = receipts.filter(r => r.type === 'breaked').length;
+        if (completed + broken === 0) return 0;
+        return Math.round((completed / (completed + broken)) * 100);
+    }, [receipts]);
+
+    // Mocked Projection Data
+    const projectionData = useMemo(() => {
+        const base = stats.activeBalance || 1000;
+        return [
+            { name: 'Month 0', principal: base, total: base },
+            { name: 'Month 3', principal: base, total: base * 1.025 },
+            { name: 'Month 6', principal: base, total: base * 1.052 },
+            { name: 'Month 9', principal: base, total: base * 1.081 },
+            { name: 'Month 12', principal: base, total: base * 1.115 }
+        ];
+    }, [stats.activeBalance]);
+
     const quickExport = (period: number) => {
         const start = new Date();
         start.setDate(start.getDate() - period);
@@ -182,11 +206,11 @@ export default function AnalysisPage() {
                 <div>
                     <div className="flex items-center gap-2 text-primary mb-2">
                         <Activity className="w-5 h-5" />
-                        <span className="text-xs font-bold uppercase tracking-widest">Financial Intelligence</span>
+                        <span className="text-xs font-bold uppercase tracking-widest">Predictive Engine</span>
                     </div>
-                    <h1 className="text-4xl font-black text-white tracking-tight">Savings Analysis</h1>
+                    <h1 className="text-4xl font-black text-white tracking-tight">Wealth Velocity Analytics</h1>
                     <p className="text-gray-400 mt-2 max-w-lg">
-                        Deep dive into your savings discipline and ProofRails verified audit trail.
+                        Visualize your future capital accumulation with Kinetic yield projections and discipline velocity.
                     </p>
                 </div>
 
@@ -203,7 +227,7 @@ export default function AnalysisPage() {
                 </div>
             </div>
 
-           
+
 
             {/* Main Visualizations */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -300,7 +324,106 @@ export default function AnalysisPage() {
                 </Card>
             </div>
 
-           
+            {/* NEW: Future Wealth Projection (Mockup for Dev Rel Feedback) */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card className="p-8 bg-zinc-900/50 border-white/5 relative overflow-hidden group">
+                    <div className="absolute -top-10 -right-10 w-40 h-40 bg-orange-500/10 blur-[80px] group-hover:bg-orange-500/20 transition-all rounded-full" />
+                    <div className="flex items-center justify-between mb-8">
+                        <div>
+                            <div className="flex items-center gap-2 mb-1">
+                                <Rocket className="w-4 h-4 text-orange-500" />
+                                <h3 className="text-xl font-bold text-white">Wealth Projection</h3>
+                            </div>
+                            <p className="text-xs text-gray-500 italic">Projected capital accumulation over time</p>
+                        </div>
+                        <div className="flex flex-col items-end">
+                            <span className="text-xs font-bold text-orange-500">Growth</span>
+                            <span className="text-[10px] text-gray-600">Trajectory</span>
+                        </div>
+                    </div>
+
+                    <div className="h-[250px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={projectionData}>
+                                <defs>
+                                    <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#FB923C" stopOpacity={0.3} />
+                                        <stop offset="95%" stopColor="#FB923C" stopOpacity={0} />
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#ffffff05" />
+                                <XAxis dataKey="name" stroke="#3f3f46" fontSize={10} axisLine={false} tickLine={false} />
+                                <YAxis stroke="#3f3f46" fontSize={10} axisLine={false} tickLine={false} hide />
+                                <Tooltip
+                                    contentStyle={{ backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '12px' }}
+                                    formatter={(value: number | undefined) => value ? [`$${value.toFixed(2)}`, ''] : ['', '']}
+                                />
+                                <Area type="monotone" dataKey="total" stroke="#FB923C" strokeWidth={3} fillOpacity={1} fill="url(#colorTotal)" />
+                                <Area type="monotone" dataKey="principal" stroke="#3f3f46" strokeDasharray="5 5" fill="none" />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    </div>
+
+                    <div className="mt-6 p-4 rounded-xl bg-orange-500/5 border border-orange-500/10">
+                        <p className="text-xs text-gray-400 text-center">
+                            Keep your savings locked to visualize optimal growth. Use this chart to stay motivated and track your long-term discipline.
+                        </p>
+                    </div>
+                </Card>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Card className="p-6 bg-zinc-900/50 border-white/5 flex flex-col justify-between">
+                        <div className="flex items-center justify-between mb-4">
+                            <Flame className="w-6 h-6 text-red-500" />
+                            <span className="text-[10px] font-bold text-gray-500 border border-white/10 px-2 py-1 rounded-full uppercase">Streak</span>
+                        </div>
+                        <div>
+                            <h4 className="text-gray-400 text-sm">Saving Streak</h4>
+                            <p className="text-3xl font-black text-white">12 Days</p>
+                        </div>
+                        <p className="text-[10px] text-gray-600 mt-2">Next reward milestone in 18 days</p>
+                    </Card>
+
+                    <Card className="p-6 bg-zinc-900/50 border-white/5 flex flex-col justify-between">
+                        <div className="flex items-center justify-between mb-4">
+                            <Zap className="w-6 h-6 text-yellow-500" />
+                            <span className="text-[10px] font-bold text-gray-500 border border-white/10 px-2 py-1 rounded-full uppercase">Score</span>
+                        </div>
+                        <div>
+                            <h4 className="text-gray-400 text-sm">Resilience Score</h4>
+                            <div className="flex items-baseline gap-2">
+                                <p className="text-3xl font-black text-white">{resilienceScore}%</p>
+                                <span className={`text-[10px] font-bold ${resilienceScore > 80 ? 'text-emerald-500' : 'text-orange-500'}`}>
+                                    {resilienceScore > 80 ? 'EXCELLENT' : 'IMPROVING'}
+                                </span>
+                            </div>
+                        </div>
+                        <p className="text-[10px] text-gray-600 mt-2">Based on completed vs broken goals</p>
+                    </Card>
+
+                    <div className="col-span-1 sm:col-span-2 p-6 bg-gradient-to-r from-primary/10 to-transparent border-white/5 flex items-center justify-between group cursor-pointer hover:border-primary/30 transition-all" onClick={() => window.location.href = '/dashboard/tips'}>
+                        <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                                <Lightbulb className="text-primary" />
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-white">Explore Savings Tips</h4>
+                                <p className="text-xs text-gray-400">Learn budgeting strategies and find earning opportunities</p>
+                            </div>
+                        </div>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="bg-white/5 hover:bg-white/10"
+                        >
+                            <ChevronRight />
+                        </Button>
+                    </div>
+                </div>
+            </div>
+
+
+
         </div>
     );
 }
