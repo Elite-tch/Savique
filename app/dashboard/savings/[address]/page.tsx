@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useReadContract, useWriteContract, useWaitForTransactionReceipt, useAccount } from "wagmi";
@@ -13,7 +13,7 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { VaultBreakModal } from "@/components/VaultBreakModal";
 import { useProofRails } from "@proofrails/sdk/react";
-import { saveReceipt } from "@/lib/receiptService";
+import { saveReceipt, getVaultByAddress, SavedVault } from "@/lib/receiptService";
 import { createNotification } from "@/lib/notificationService";
 
 const MOTIVATION_QUOTES = [
@@ -37,7 +37,7 @@ function useCountdown(targetDate: Date) {
             const now = new Date().getTime();
             const difference = targetTime - now;
             if (difference <= 0) {
-                setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0, isExpired: true });
+                setTimeLeft(prev => prev.isExpired ? prev : { days: 0, hours: 0, minutes: 0, seconds: 0, isExpired: true });
                 return;
             }
             setTimeLeft({
@@ -74,16 +74,17 @@ export default function VaultDetailPage() {
     // ProofRails Integration
     const sdk = useProofRails();
     const [isGeneratingProof, setIsGeneratingProof] = useState(false);
+    const [vaultData, setVaultData] = useState<SavedVault | null>(null);
 
-    // Brand Styled Toast
-    const toastStyle = {
-        className: "bg-[#E62058]/10 border-[#E62058]/20 text-[#E62058]",
-        style: {
-            backgroundColor: 'rgba(230, 32, 88, 0.1)',
-            borderColor: 'rgba(230, 32, 88, 0.2)',
-            color: '#E62058'
-        }
-    };
+    useEffect(() => {
+        const fetchVault = async () => {
+            if (address) {
+                const data = await getVaultByAddress(address);
+                setVaultData(data);
+            }
+        };
+        fetchVault();
+    }, [address]);
 
     // Contract interactions
     const { data: purpose } = useReadContract({ address, abi: VAULT_ABI, functionName: "purpose" });
@@ -94,6 +95,26 @@ export default function VaultDetailPage() {
         abi: ERC20_ABI,
         functionName: 'decimals',
     });
+
+    const accruedBonus = useMemo(() => {
+        if (!balanceResult || !vaultData || !decimals) return "0.000";
+        const bal = parseFloat(formatUnits(balanceResult, decimals as number || 18));
+        const now = Date.now();
+        const start = vaultData.createdAt;
+        const elapsedYears = (now - start) / (1000 * 60 * 60 * 24 * 365);
+        // Assuming 10% yield, user gets 10% share = 1% APY effective
+        return (bal * 0.01 * elapsedYears).toFixed(4);
+    }, [balanceResult, vaultData, decimals]);
+
+    // Brand Styled Toast
+    const toastStyle = {
+        className: "bg-[#E62058]/10 border-[#E62058]/20 text-[#E62058]",
+        style: {
+            backgroundColor: 'rgba(230, 32, 88, 0.1)',
+            borderColor: 'rgba(230, 32, 88, 0.2)',
+            color: '#E62058'
+        }
+    };
 
     // Withdrawal for unlocked vault
     const { writeContract, data: hash, isPending: isWithdrawPending, error: writeError } = useWriteContract();
@@ -289,15 +310,22 @@ export default function VaultDetailPage() {
                     <Card className="p-6 bg-zinc-900/50 border-zinc-800">
                         <div className="flex items-start justify-between mb-4">
                             <div>
-                                <p className="text-sm text-zinc-500 mb-1">Total Balance</p>
+                                <p className="text-sm text-zinc-500 mb-1">Total Principal</p>
                                 <h3 className="text-2xl font-bold text-white flex items-baseline gap-1">
                                     {parseFloat(balance).toFixed(2)} <span className="text-sm font-normal text-zinc-500">USDT0</span>
                                 </h3>
                             </div>
                         </div>
-                        <div className="flex items-center gap-2 text-xs text-zinc-500 pt-4 border-t border-zinc-800/50">
-                            <ShieldCheck className="w-3 h-3 text-primary" />
-                            Secured by Smart Contract
+                        <div className="h-px bg-zinc-800/50 w-full mb-4" />
+                        <div>
+                            <p className="text-sm text-orange-500 mb-1 flex items-center gap-2">
+                                <ShieldCheck className="w-4 h-4" />
+                                Accrued Success Bonus
+                            </p>
+                            <h3 className="text-xl font-bold text-white flex items-baseline gap-1">
+                                +{accruedBonus} <span className="text-sm font-normal text-zinc-500">USDT0</span>
+                            </h3>
+                            <p className="text-[10px] text-zinc-600 mt-1">Claimable upon successful completion</p>
                         </div>
                     </Card>
 

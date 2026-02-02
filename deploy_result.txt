@@ -1,0 +1,4 @@
+﻿[dotenv@17.2.3] injecting env (10) from .env -- tip: Γ£à audit secrets and track compliance: https://dotenvx.com/ops
+[dotenv@17.2.3] injecting env (0) from .env -- tip: ΓÜÖ∩╕Å  specify custom .env file path with { path: '/custom/path/.env' }
+ Deploying SafeVault contracts to Coston2...
+

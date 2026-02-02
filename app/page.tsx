@@ -85,7 +85,7 @@ export default function LandingPage() {
 
                         </div>
                     </motion.div>
-                   
+
                 </div>
 
                 {/* Features / Why Grid */}
@@ -98,10 +98,9 @@ export default function LandingPage() {
                             <div className="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center mb-6">
                                 <Wallet className="w-6 h-6 text-blue-500" />
                             </div>
-                            <h3 className="text-xl font-bold text-white mb-3">Personal Goals</h3>
+                            <h3 className="text-xl font-bold text-white mb-3">Commitment Rewards</h3>
                             <p className="text-gray-400">
-                                Lock your USDT0 for a set time. Early withdrawals incur penalties,
-                                forcing you to stick to your commitments.
+                                Lock your assets and earn a success bonus upon completion. Early withdrawals incur a 10% penalty—discipline pays off.
                             </p>
                         </motion.div>
 

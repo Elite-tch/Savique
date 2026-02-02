@@ -173,9 +173,9 @@ export function VaultBreakModal({
                     <div className="mx-auto w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mb-4">
                         <AlertTriangle className="w-8 h-8 text-red-500" />
                     </div>
-                    <h2 className="text-2xl font-bold text-red-500 mb-2">Break Vault Warning</h2>
+                    <h2 className="text-2xl font-bold text-red-500 mb-2">Break Commitment?</h2>
                     <p className="text-sm text-zinc-400">
-                        You are about to break this lock early. This action is irreversible.
+                        Breaking your commitment means losing your accrued success bonus and paying a 10% early exit fee.
                     </p>
                 </div>
 
@@ -186,7 +186,7 @@ export function VaultBreakModal({
                             <span className="font-mono text-white">{parseFloat(balance).toFixed(2)} USDT0</span>
                         </div>
                         <div className="flex justify-between items-center text-sm text-red-400">
-                            <span className="flex items-center gap-1"><TrendingDown className="w-4 h-4" /> Penalty ({penaltyPercent}%)</span>
+                            <span className="flex items-center gap-1"><TrendingDown className="w-4 h-4" /> Commitment Fee ({penaltyPercent}%)</span>
                             <span className="font-mono font-bold">-{penaltyAmount.toFixed(2)} USDT0</span>
                         </div>
                         <div className="h-px bg-red-500/20 w-full" />
@@ -196,7 +196,7 @@ export function VaultBreakModal({
                         </div>
                     </div>
                     <p className="text-xs text-center text-zinc-500 px-4">
-                        The penalty amount will be forfeited to the protocol treasury to enforce community updates.
+                        All accrued success bonuses and the commitment fee will be forfeited to the protocol.
                     </p>
                 </div>
 

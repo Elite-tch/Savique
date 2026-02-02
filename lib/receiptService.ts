@@ -193,6 +193,33 @@ export async function getUserVaultsFromDb(ownerAddress: string): Promise<string[
     }
 }
 
+export async function getVaultByAddress(vaultAddress: string): Promise<SavedVault | null> {
+    try {
+        const vaultsRef = collection(db, VAULTS_COLLECTION);
+        const q = query(vaultsRef, where('vaultAddress', '==', vaultAddress.toLowerCase()));
+        const snapshot = await getDocs(q);
+
+        if (snapshot.empty) return null;
+
+        const data = snapshot.docs[0].data();
+        let createdDay = data.createdAt;
+        if (createdDay && typeof createdDay.toMillis === 'function') {
+            createdDay = createdDay.toMillis();
+        }
+
+        return {
+            vaultAddress: data.vaultAddress,
+            owner: data.owner,
+            factoryAddress: data.factoryAddress,
+            createdAt: createdDay || Date.now(),
+            purpose: data.purpose
+        };
+    } catch (error) {
+        console.error('Error fetching vault by address:', error);
+        return null;
+    }
+}
+
 /**
  * Get ALL vaults for Admin Dashboard
  */

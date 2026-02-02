@@ -159,12 +159,13 @@ export default function AnalysisPage() {
     // Mocked Projection Data
     const projectionData = useMemo(() => {
         const base = stats.activeBalance || 1000;
+        // Visualizing a 1% cumulative bonus (representing 10% share of a ~10% yield)
         return [
-            { name: 'Month 0', principal: base, total: base },
-            { name: 'Month 3', principal: base, total: base * 1.025 },
-            { name: 'Month 6', principal: base, total: base * 1.052 },
-            { name: 'Month 9', principal: base, total: base * 1.081 },
-            { name: 'Month 12', principal: base, total: base * 1.115 }
+            { name: 'Start', principal: base, total: base },
+            { name: '3 Months', principal: base, total: base * 1.0025 },
+            { name: '6 Months', principal: base, total: base * 1.0050 },
+            { name: '9 Months', principal: base, total: base * 1.0075 },
+            { name: '1 Year', principal: base, total: base * 1.0100 }
         ];
     }, [stats.activeBalance]);
 
@@ -206,11 +207,11 @@ export default function AnalysisPage() {
                 <div>
                     <div className="flex items-center gap-2 text-primary mb-2">
                         <Activity className="w-5 h-5" />
-                        <span className="text-xs font-bold uppercase tracking-widest">Predictive Engine</span>
+                        <span className="text-xs font-bold uppercase tracking-widest">Commitment Logic</span>
                     </div>
-                    <h1 className="text-4xl font-black text-white tracking-tight">Wealth Velocity Analytics</h1>
+                    <h1 className="text-4xl font-black text-white tracking-tight">Savings Performance</h1>
                     <p className="text-gray-400 mt-2 max-w-lg">
-                        Visualize your future capital accumulation with Kinetic yield projections and discipline velocity.
+                        Track your discipline history and visualize the success rewards earned for meeting your commitments.
                     </p>
                 </div>
 
@@ -332,13 +333,13 @@ export default function AnalysisPage() {
                         <div>
                             <div className="flex items-center gap-2 mb-1">
                                 <Rocket className="w-4 h-4 text-orange-500" />
-                                <h3 className="text-xl font-bold text-white">Wealth Projection</h3>
+                                <h3 className="text-xl font-bold text-white">Success Bonus Projection</h3>
                             </div>
-                            <p className="text-xs text-gray-500 italic">Projected capital accumulation over time</p>
+                            <p className="text-xs text-gray-500 italic">Projected rewards for disciplined completion</p>
                         </div>
                         <div className="flex flex-col items-end">
-                            <span className="text-xs font-bold text-orange-500">Growth</span>
-                            <span className="text-[10px] text-gray-600">Trajectory</span>
+                            <span className="text-xs font-bold text-orange-500">Bonus</span>
+                            <span className="text-[10px] text-gray-600">Accrual</span>
                         </div>
                     </div>
 
@@ -366,7 +367,7 @@ export default function AnalysisPage() {
 
                     <div className="mt-6 p-4 rounded-xl bg-orange-500/5 border border-orange-500/10">
                         <p className="text-xs text-gray-400 text-center">
-                            Keep your savings locked to visualize optimal growth. Use this chart to stay motivated and track your long-term discipline.
+                            By completing your savings goals, you earn a <span className="text-white font-bold">10% share of generated rewards</span>. This chart visualizes your potential bonus growth through discipline.
                         </p>
                     </div>
                 </Card>

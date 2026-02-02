@@ -30,7 +30,7 @@ function useCountdown(targetDate: Date) {
             const difference = targetTime - now;
 
             if (difference <= 0) {
-                setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0, isExpired: true });
+                setTimeLeft(prev => prev.isExpired ? prev : { days: 0, hours: 0, minutes: 0, seconds: 0, isExpired: true });
                 return;
             }
 
@@ -166,7 +166,7 @@ function VaultCard({ address }: { address: `0x${string}` }) {
                         <div className="pt-4 border-t border-white/5">
                             <div className="flex justify-between items-end">
                                 <div>
-                                    <p className="text-xs text-gray-500 mb-1">Total Savings</p>
+                                    <p className="text-xs text-gray-500 mb-1">Total Principal</p>
                                     <div className="text-lg font-bold text-white flex items-center gap-1">
                                         {parseFloat(balance).toFixed(2)} <span className="text-xs font-normal text-gray-500">USDT0</span>
                                     </div>
