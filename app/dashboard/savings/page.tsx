@@ -505,7 +505,7 @@ function SavingsDashboard() {
                         <p className="text-zinc-500 mb-8 max-w-sm mx-auto">
                             {activeTab === 'active' ? "You don't have any locked commitment plans yet. Create one to secure your future." :
                                 activeTab === 'matured' ? "All your locks are currently active. Once a lock expires, it will appear here for withdrawal." :
-                                    "You haven't fully withdrawn or broken any vaults yet. Your completed history will be archived here."}
+                                    "You haven't fully withdrawn or broken any Savings yet. Your completed history will be archived here."}
                         </p>
                         {activeTab === 'active' && (
                             <Link href="/dashboard/create">

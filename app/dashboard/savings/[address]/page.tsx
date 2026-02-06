@@ -359,7 +359,7 @@ export default function VaultDetailPage() {
 
         // Issue 3: Prevent topping up more than goal
         if (target > 0 && currentTotal + adding > target) {
-            toast.error(`Deposit exceeds goal! Your target is $${target}. Reach this milestone or create a new vault.`, toastStyle);
+            toast.error(`Deposit exceeds goal! Your target is $${target}. Reach this milestone or create a new savings.`, toastStyle);
             return;
         }
 
@@ -439,14 +439,14 @@ export default function VaultDetailPage() {
                     <Wallet className="w-16 h-16 text-gray-500 mx-auto mb-4" />
                     <h2 className="text-2xl font-bold text-white mb-2">Connect Your Wallet</h2>
                     <p className="text-gray-400">
-                        Please connect your wallet to view your dashboard and manage your vaults.
+                        Please connect your wallet to view your dashboard and manage your savings.
                     </p>
                 </Card>
             </div>
         );
     }
 
-    if (!address) return <div>Invalid Vault Address</div>;
+    if (!address) return <div>Invalid Savings Address</div>;
 
     return (
         <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in duration-500">
@@ -459,7 +459,7 @@ export default function VaultDetailPage() {
                 </Link>
                 <div>
                     <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-                        {purpose || "Vault Details"}
+                        {purpose || "Savings Details"}
                         <span className={`px-2 py-0.5 rounded text-xs border ${withdrawalReceipt?.type === 'breaked'
                             ? 'bg-red-500/10 border-red-500/20 text-red-500'
                             : 'bg-green-500/10 border-green-500/20 text-green-500'
@@ -512,32 +512,7 @@ export default function VaultDetailPage() {
                                             <span>${(parseFloat(vaultData.targetAmount) - parseFloat(balance) > 0 ? parseFloat(vaultData.targetAmount) - parseFloat(balance) : 0).toLocaleString()} Remaining</span>
                                         </div>
                                     </div>
-                                ) : (
-                                    <div className="w-full max-w-md mt-4 p-4 rounded-xl border border-dashed border-white/10 bg-white/5">
-                                        <p className="text-xs text-zinc-400 mb-2">No target set for this vault.</p>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            className="h-8 text-[10px] border-primary/20 hover:bg-primary/10 text-primary"
-                                            onClick={() => {
-                                                const newTarget = prompt("Enter target amount for this goal:", balance);
-                                                if (newTarget && !isNaN(parseFloat(newTarget))) {
-                                                    saveVault({
-                                                        ...vaultData!,
-                                                        vaultAddress: address,
-                                                        owner: userAddress!.toLowerCase(),
-                                                        factoryAddress: CONTRACTS.coston2.VaultFactory,
-                                                        targetAmount: newTarget
-                                                    }).then(() => {
-                                                        window.location.reload();
-                                                    });
-                                                }
-                                            }}
-                                        >
-                                            Set Target Goal
-                                        </Button>
-                                    </div>
-                                )}
+                                ) : null}
                             </>
                         ) : (
                             <>
@@ -546,11 +521,11 @@ export default function VaultDetailPage() {
                                 </div>
                                 <div>
                                     <h2 className="text-4xl font-bold text-white mb-2">
-                                        {withdrawalReceipt?.type === 'breaked' ? 'Vault Closed' : 'Goal Achieved!'}
+                                        {withdrawalReceipt?.type === 'breaked' ? 'Savings Closed' : 'Goal Achieved!'}
                                     </h2>
                                     <p className="text-zinc-400 max-w-sm mx-auto">
                                         {withdrawalReceipt?.type === 'breaked'
-                                            ? 'This vault was closed early. Your principal (after penalty) has been returned to your wallet.'
+                                            ? 'This Savings was closed early. Your principal (after penalty) has been returned to your wallet.'
                                             : 'You have successfully completed your savings goal. Your funds have been withdrawn.'}
                                     </p>
                                 </div>
@@ -599,59 +574,63 @@ export default function VaultDetailPage() {
                     <div className="space-y-3 pt-2">
                         {parseFloat(balance) <= 0 ? (
                             <Button disabled className="w-full bg-zinc-800/50 text-zinc-500 border border-zinc-700/30 cursor-not-allowed">
-                                Vault Inactive
+                                Savings Inactive
                             </Button>
                         ) : isLocked ? (
                             <>
-                                {isTopUpMode ? (
-                                    <motion.div
-                                        initial={{ opacity: 0, height: 0 }}
-                                        animate={{ opacity: 1, height: 'auto' }}
-                                        className="space-y-4 p-4 rounded-xl bg-white/5 border border-white/10"
-                                    >
-                                        <div className="space-y-2">
-                                            <div className="flex justify-between text-xs">
-                                                <span className="text-zinc-500">Amount to Add</span>
-                                                {userBalance !== undefined && (
-                                                    <span className="text-zinc-400">Bal: {formatUnits(userBalance as bigint, decimals as number || 18)} USDT0</span>
-                                                )}
-                                            </div>
-                                            <div className="relative">
-                                                <input
-                                                    type="number"
-                                                    placeholder="0.00"
-                                                    className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-primary/50 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                                    value={topUpAmount}
-                                                    onChange={(e) => setTopUpAmount(e.target.value)}
-                                                />
-                                            </div>
-                                        </div>
-                                        <div className="flex gap-2">
-                                            <Button
-                                                className="flex-1 h-9 rounded-lg"
-                                                onClick={() => handleTopUp()}
-                                                disabled={topUpStep !== 'idle' || isConfirming || !topUpAmount}
+                                {vaultData?.targetAmount && parseFloat(vaultData.targetAmount) > 0 && (
+                                    <>
+                                        {isTopUpMode ? (
+                                            <motion.div
+                                                initial={{ opacity: 0, height: 0 }}
+                                                animate={{ opacity: 1, height: 'auto' }}
+                                                className="space-y-4 p-4 rounded-xl bg-white/5 border border-white/10"
                                             >
-                                                {(topUpStep === 'approving' || topUpStep === 'depositing' || isConfirming) ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <ArrowUpCircle className="w-4 h-4 mr-2" />}
-                                                {topUpStep === 'approving' ? 'Approving...' : (topUpStep === 'depositing' || isConfirming) ? 'Processing...' : 'Confirm'}
-                                            </Button>
+                                                <div className="space-y-2">
+                                                    <div className="flex justify-between text-xs">
+                                                        <span className="text-zinc-500">Amount to Add</span>
+                                                        {userBalance !== undefined && (
+                                                            <span className="text-zinc-400">Bal: {formatUnits(userBalance as bigint, decimals as number || 18)} USDT0</span>
+                                                        )}
+                                                    </div>
+                                                    <div className="relative">
+                                                        <input
+                                                            type="number"
+                                                            placeholder="0.00"
+                                                            className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-primary/50 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                            value={topUpAmount}
+                                                            onChange={(e) => setTopUpAmount(e.target.value)}
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    <Button
+                                                        className="flex-1 h-9 rounded-lg"
+                                                        onClick={() => handleTopUp()}
+                                                        disabled={topUpStep !== 'idle' || isConfirming || !topUpAmount}
+                                                    >
+                                                        {(topUpStep === 'approving' || topUpStep === 'depositing' || isConfirming) ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <ArrowUpCircle className="w-4 h-4 mr-2" />}
+                                                        {topUpStep === 'approving' ? 'Approving...' : (topUpStep === 'depositing' || isConfirming) ? 'Processing...' : 'Confirm'}
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        className="h-9 w-9 p-0 rounded-lg hover:bg-white/10"
+                                                        onClick={() => { setIsTopUpMode(false); setTopUpAmount(""); }}
+                                                    >
+                                                        <ArrowLeft className="w-4 h-4" />
+                                                    </Button>
+                                                </div>
+                                            </motion.div>
+                                        ) : (
                                             <Button
-                                                variant="ghost"
-                                                className="h-9 w-9 p-0 rounded-lg hover:bg-white/10"
-                                                onClick={() => { setIsTopUpMode(false); setTopUpAmount(""); }}
+                                                className="w-full h-12 rounded-xl bg-primary hover:bg-primary/90 text-white font-bold shadow-lg shadow-primary/20"
+                                                onClick={() => setIsTopUpMode(true)}
                                             >
-                                                <ArrowLeft className="w-4 h-4" />
+                                                <Plus className="w-5 h-5 mr-2" />
+                                                Top Up Savings
                                             </Button>
-                                        </div>
-                                    </motion.div>
-                                ) : (
-                                    <Button
-                                        className="w-full h-12 rounded-xl bg-primary hover:bg-primary/90 text-white font-bold shadow-lg shadow-primary/20"
-                                        onClick={() => setIsTopUpMode(true)}
-                                    >
-                                        <Plus className="w-5 h-5 mr-2" />
-                                        Top Up Savings
-                                    </Button>
+                                        )}
+                                    </>
                                 )}
 
                                 <Button
@@ -661,7 +640,7 @@ export default function VaultDetailPage() {
                                     onClick={() => setIsBreakModalOpen(true)}
                                 >
                                     <AlertTriangle className="w-4 h-4 mr-2" />
-                                    Break Vault Early
+                                    Break Savings Early
                                 </Button>
                             </>
                         ) : (

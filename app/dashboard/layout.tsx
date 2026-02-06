@@ -122,7 +122,7 @@ function SidebarContent({ pathname, onNavigate }: { pathname: string; onNavigate
                     <div className="relative w-8 h-8 rounded-lg overflow-hidden flex-shrink-0">
                         <Image
                             src="/logo3.png"
-                            alt="SafeVault Logo"
+                            alt="Savique Logo"
                             fill
                             className="object-contain"
                         />
@@ -288,7 +288,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <main className="flex-1 p-4 md:p-8 overflow-x-hidden">
                     <div className="max-w-7xl mx-auto w-full">
                         {children}
-                       
+
                     </div>
                 </main>
 

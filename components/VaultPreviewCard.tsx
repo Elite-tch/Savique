@@ -60,7 +60,7 @@ export function VaultPreviewCard({ address, index }: { address: `0x${string}`; i
     return (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.1 }}>
             <Link href={`/dashboard/savings/${address}`}>
-                <Card className="hover:border-primary/50 transition-all cursor-pointer group p-8">
+                <Card className="bg-zinc-900/40 border-zinc-800/50 hover:border-zinc-700 transition-all cursor-pointer group p-8">
                     <div className="flex justify-between items-start mb-3">
                         <h3 className="text-lg font-bold text-white truncate">{purpose || "Loading..."}</h3>
                         <div className={`px-2 py-1 rounded text-xs font-medium ${isLocked ? 'bg-orange-500/10 text-orange-400' : 'bg-green-500/10 text-green-400'}`}>

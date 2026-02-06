@@ -206,7 +206,7 @@ export function VaultBreakModal({
                         className="w-full bg-red-600 hover:bg-red-700 text-white border-none py-2 text-lg font-semibold shadow-lg shadow-red-900/20"
                         disabled={isWritePending || isConfirming}
                     >
-                        {isWritePending || isConfirming ? "Processing Withdrawal..." : "Confirm & Break Vault"}
+                        {isWritePending || isConfirming ? "Processing Withdrawal..." : "Confirm & Break Savings"}
                     </Button>
                     <Button
                         variant="ghost"

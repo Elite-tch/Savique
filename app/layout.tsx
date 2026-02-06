@@ -12,7 +12,7 @@ export const metadata: Metadata = {
     default: "Savique | Secure Crypto Savings on Flare",
     template: "%s | Savique"
   },
-  description: "Savique is the smart commitment protocol for your capital. Create purpose-driven, time-locked savings vaults on the Flare Network. Build financial discipline, earn verifiable proofs, and secure your future.",
+  description: "Savique is the smart commitment protocol for your capital. Create purpose-driven, time-locked Savings on the Flare Network. Build financial discipline, earn verifiable proofs, and secure your future.",
   applicationName: "Savique",
   authors: [{ name: "Savique Team", url: "https://savique.finance" }],
   creator: "Savique Team",
@@ -54,7 +54,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "Savique | Secure Crypto Savings on Flare",
-    description: "Secure your financial future with Savique. Smart vaults for disciplined savings.",
+    description: "Secure your financial future with Savique. Smart Savings for disciplined wealth building.",
     creator: "@SaviqueApp", // Placeholder handle
     images: ["/og-image.png"],
   },

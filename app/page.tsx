@@ -23,7 +23,7 @@ export default function LandingPage() {
                             "price": "0",
                             "priceCurrency": "USD"
                         },
-                        "description": "Smart Commitment Protocol for your capital on Flare Network. Savings vaults with verifiable proofs.",
+                        "description": "Smart Commitment Protocol for your capital on Flare Network. Savings with verifiable proofs.",
                         "aggregateRating": {
                             "@type": "AggregateRating",
                             "ratingValue": "4.8",

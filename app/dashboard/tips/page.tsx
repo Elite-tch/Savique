@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 const TIPS = [
     {
         category: "Budgeting Basics",
-      
+
         color: "text-blue-500",
         tips: [
             {
@@ -31,13 +31,13 @@ const TIPS = [
             },
             {
                 title: "Pay Yourself First",
-                description: "Before paying bills or spending, immediately move savings into a separate account or vault. Treat savings as a non-negotiable expense.",
+                description: "Before paying bills or spending, immediately move savings into a separate account or Savings. Treat savings as a non-negotiable expense.",
             }
         ]
     },
     {
         category: "Building Discipline",
-      
+
         color: "text-emerald-500",
         tips: [
             {
@@ -46,17 +46,17 @@ const TIPS = [
             },
             {
                 title: "Automate Everything",
-                description: "Set up automatic transfers to your Savique vault right after payday. Remove the decision-making process entirely.",
+                description: "Set up automatic transfers to your Savique Savings right after payday. Remove the decision-making process entirely.",
             },
             {
                 title: "Visualize Your Goal",
-                description: "Name your vaults after specific goals (e.g., 'Emergency Fund', 'Laptop', 'Vacation'). Concrete targets are easier to commit to than abstract 'savings'.",
+                description: "Name your Savings after specific goals (e.g., 'Emergency Fund', 'Laptop', 'Vacation'). Concrete targets are easier to commit to than abstract 'savings'.",
             }
         ]
     },
     {
         category: "Earning More",
-    
+
         color: "text-orange-500",
         tips: [
             {
@@ -110,7 +110,7 @@ export default function SavingsTipsPage() {
                 </div>
                 <h1 className="text-4xl font-bold tracking-tight">Savings Tips</h1>
                 <p className="text-gray-400 text-lg max-w-2xl">
-                    Practical strategies to build discipline, increase income, and make the most of your Savique vaults.
+                    Practical strategies to build discipline, increase income, and make the most of your Savique Savings.
                 </p>
             </div>
 
@@ -118,7 +118,7 @@ export default function SavingsTipsPage() {
             {TIPS.map((section, idx) => (
                 <section key={idx} className="space-y-6">
                     <div className="flex items-center gap-3 pb-3 border-b border-white/10">
-                        
+
                         <h2 className="text-2xl font-bold">{section.category}</h2>
                     </div>
 
@@ -132,22 +132,22 @@ export default function SavingsTipsPage() {
                             </Card>
                         ))}
                     </div>
-                     <div className="absolute top-0 right-0 -mt-20 w-96 h-96 bg-primary/20 blur-[120px] fixed rounded-full pointer-events-none" />
-                                    <div className="absolute top-52 right-10 hidden md:block fixed  opacity-20 pointer-events-none">
-                                        <Lightbulb size={240} className="text-white" />
-                                    </div>
-                                
+                    <div className="absolute top-0 right-0 -mt-20 w-96 h-96 bg-primary/20 blur-[120px] fixed rounded-full pointer-events-none" />
+                    <div className="absolute top-52 right-10 hidden md:block fixed  opacity-20 pointer-events-none">
+                        <Lightbulb size={240} className="text-white" />
+                    </div>
+
                 </section>
             ))}
- 
+
             {/* Flare Ecosystem Opportunities */}
             <section className="space-y-6">
                 <div className="flex items-center gap-3 pb-3 border-b border-white/10">
-                  
+
                     <h2 className="text-2xl font-bold">Earn on Flare</h2>
                 </div>
                 <p className="text-gray-400 text-sm">
-                    These are legitimate ways to earn additional income within the Flare ecosystem. Earnings can be deposited directly into your Savique vaults.
+                    These are legitimate ways to earn additional income within the Flare ecosystem. Earnings can be deposited directly into your Savique Savings.
                 </p>
 
                 <div className="space-y-4">

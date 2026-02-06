@@ -237,7 +237,7 @@ export default function CreatePersonalVault() {
             } else {
                 // Allowance is good, go straight to create
                 setCurrentStep('creating');
-                toastId.current = toast.loading("Creating & Funding Vault...", toastStyle);
+                toastId.current = toast.loading("Creating & Funding Savings...", toastStyle);
                 triggerCreateVault();
             }
 
@@ -264,7 +264,7 @@ export default function CreatePersonalVault() {
 
 
         } catch (dbError) {
-            console.error("❌ Failed to save vault to registry:", dbError);
+            console.error("❌ Failed to save savings to registry:", dbError);
             // We continue, but this is bad.
         }
 
@@ -306,7 +306,7 @@ export default function CreatePersonalVault() {
             });
 
             setCurrentStep('done');
-            toast.success("All Done! Vault Created.", toastStyle);
+            toast.success("All Done! Savings Created.", toastStyle);
             setTimeout(() => router.push("/dashboard/savings"), 1500);
         } catch (e: any) {
             console.error("❌ Proof generation failed:", e);
@@ -332,7 +332,7 @@ export default function CreatePersonalVault() {
                 `/dashboard/savings/${targetVault}`
             );
 
-            toast.error("Receipt Gen Failed but Vault Created", toastStyle);
+            toast.error("Receipt Gen Failed but Savings Created", toastStyle);
             setCurrentStep('done');
             setTimeout(() => router.push("/dashboard/savings"), 2000);
         }
@@ -365,7 +365,7 @@ export default function CreatePersonalVault() {
     // UI Helpers
     const isProcessing = currentStep !== 'idle' && currentStep !== 'done';
     const getButtonText = () => {
-        if (currentStep === 'creating') return "Creating Vault...";
+        if (currentStep === 'creating') return "Creating Savings...";
         if (currentStep === 'approving') return "Approving USDT0...";
         if (currentStep === 'generating_proof') return "Finalizing Receipt...";
         if (currentStep === 'done') return "Redirecting...";
@@ -379,7 +379,7 @@ export default function CreatePersonalVault() {
                     <Wallet className="w-16 h-16 text-gray-500 mx-auto mb-4" />
                     <h2 className="text-2xl font-bold text-white mb-2">Connect Your Wallet</h2>
                     <p className="text-gray-400">
-                        Please connect your wallet to view your dashboard and manage your vaults.
+                        Please connect your wallet to view your dashboard and manage your savings.
                     </p>
                 </Card>
             </div>

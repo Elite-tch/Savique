@@ -199,7 +199,7 @@ export default function AdminDashboard() {
                 <KPICard title="Protocol TVL" value={formatUSD(stats.tvl)} icon={<DollarSign className="text-green-500" />} />
                 <KPICard title="Penalty Revenue" value={formatUSD(stats.revenue)} icon={<TrendingUp className="text-red-500" />} />
                 <KPICard title="Total Users" value={stats.users.toString()} icon={<Users className="text-blue-400" />} />
-                <KPICard title="Active Vaults" value={stats.active.toString()} icon={<Clock className="text-orange-500" />} />
+                <KPICard title="Active Savings" value={stats.active.toString()} icon={<Clock className="text-orange-500" />} />
                 <KPICard title="Successful Goals" value={stats.completed.toString()} icon={<CheckCircle2 className="text-emerald-500" />} />
             </div>
 

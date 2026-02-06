@@ -65,7 +65,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <header className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-black/50 backdrop-blur-xl border-b border-white/5 flex items-center justify-between px-6 z-40">
                 <div className="flex items-center gap-3">
                     <div className="relative w-8 h-8 rounded-lg overflow-hidden">
-                        <Image src="/logo.png" alt="Logo" fill className="object-contain" />
+                        <Image src="/logo3.png" alt="Logo" fill className="object-contain" />
                     </div>
                     <span className="font-bold text-lg">Savique</span>
                 </div>
@@ -95,8 +95,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                         <div className="h-20 flex items-center gap-3 px-2 border-b border-white/5 mb-6">
                             <div className="relative w-8 h-8 rounded-lg overflow-hidden flex-shrink-0">
                                 <Image
-                                    src="/logo.png"
-                                    alt="SafeVault Logo"
+                                    src="/logo3.png"
+                                    alt="Savique Logo"
                                     fill
                                     className="object-contain"
                                 />

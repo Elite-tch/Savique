@@ -42,7 +42,7 @@ export default function AdminLoginPage() {
             <Card className="w-full max-w-md p-8 bg-black/50 border-white/10 backdrop-blur-xl relative z-10">
                 <div className="flex flex-col items-center mb-8">
                     <div className="relative w-12 h-12 mb-4">
-                        <Image src="/logo.png" alt="Logo" fill className="object-contain opacity-80" />
+                        <Image src="/logo3.png" alt="Logo" fill className="object-contain opacity-80" />
                     </div>
                     <h1 className="text-2xl font-bold text-white">Admin Console</h1>
                     <p className="text-gray-500 text-sm">Restricted Access Only</p>
@@ -80,7 +80,7 @@ export default function AdminLoginPage() {
                     <Button
                         type="submit"
                         disabled={loading}
-                        className="w-full bg-red-600 hover:bg-red-700 text-white font-medium py-6"
+                        className="w-full bg-red-600 hover:bg-red-700 text-white font-medium py-3 mt-3"
                     >
                         {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Authenticate"}
                     </Button>

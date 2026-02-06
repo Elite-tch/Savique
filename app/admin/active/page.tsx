@@ -92,14 +92,14 @@ export default function ActiveSavingsPage() {
             <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-xl md:text-2xl font-bold">Active Savings</h1>
-                    <p className="text-gray-500 text-xs md:text-sm italic">Tracking current on-chain vault commitments</p>
+                    <p className="text-gray-500 text-xs md:text-sm italic">Tracking current on-chain savings commitments</p>
                 </div>
 
                 <div className="relative w-full sm:w-64">
                     <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
                     <input
                         type="text"
-                        placeholder="Search vaults or users..."
+                        placeholder="Search Savings or users..."
                         value={searchQuery}
                         onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
                         className="bg-white/5 border border-white/10 rounded-lg pl-9 pr-4 py-2 text-sm text-gray-300 focus:outline-none focus:border-red-600/50 w-full transition-all"
@@ -112,7 +112,7 @@ export default function ActiveSavingsPage() {
                     <table className="w-full text-left text-sm">
                         <thead className="text-gray-500 uppercase text-[10px] tracking-wider bg-white/5">
                             <tr>
-                                <th className="px-6 py-4">Vault Purpose</th>
+                                <th className="px-6 py-4">Savings Purpose</th>
                                 <th className="px-6 py-4">User Address</th>
                                 <th className="px-6 py-4 text-right">Balance</th>
                                 <th className="px-6 py-4 text-right">Lock Expiration</th>
@@ -132,7 +132,7 @@ export default function ActiveSavingsPage() {
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-2">
                                                 <Lock size={12} className="text-red-500" />
-                                                <span className="font-medium text-white">{vault.purpose || "Savings Vault"}</span>
+                                                <span className="font-medium text-white">{vault.purpose || "Savings"}</span>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 font-mono text-gray-400 text-xs">{vault.owner}</td>
@@ -173,7 +173,7 @@ export default function ActiveSavingsPage() {
 
                 {totalPages > 1 && (
                     <div className="p-4 bg-white/5 border-t border-white/5 flex items-center justify-between">
-                        <p className="text-xs text-gray-400">Showing {paginatedActive.length} of {activeList.length} vaults</p>
+                        <p className="text-xs text-gray-400">Showing {paginatedActive.length} of {activeList.length} savings</p>
                         <div className="flex gap-2">
                             <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>
                                 <ChevronLeft size={16} />

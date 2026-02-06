@@ -21,7 +21,7 @@ function StatCard({ stat }: { stat: any }) {
     const Icon = stat.icon;
 
     return (
-        <Card className="relative p-0 overflow-hidden bg-white/5 border-white/10">
+        <Card className="relative p-0 overflow-hidden bg-zinc-900/40 border-zinc-800/50 hover:border-zinc-700 transition-all">
             <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-primary/10 to-transparent rounded-full blur-2xl" />
             <div className="relative p-6">
                 <div className="flex items-center justify-between mb-2">
@@ -117,7 +117,7 @@ export default function Dashboard() {
                                 owner: address.toLowerCase(),
                                 factoryAddress: factoryAddress,
                                 createdAt: Date.now(),
-                                purpose: "Imported Vault"
+                                purpose: "Imported Savings"
                             });
                         });
                     }
@@ -262,7 +262,7 @@ export default function Dashboard() {
     if (!isConnected) {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
-                <Card className="p-12 text-center max-w-md bg-white/5 border-white/10">
+                <Card className="p-12 text-center max-w-md bg-zinc-900/40 border-zinc-800/50 hover:border-zinc-700 transition-all">
                     <Wallet className="w-16 h-16 text-gray-500 mx-auto mb-4" />
                     <h2 className="text-2xl font-bold text-white mb-2">Connect Your Wallet</h2>
                     <p className="text-gray-400">
@@ -278,7 +278,7 @@ export default function Dashboard() {
             <div className="flex justify-between items-center">
                 <div>
                     <h1 className="text-3xl font-bold text-white">Dashboard Overview</h1>
-                    <p className="text-gray-400 mt-1">Snapshot of your wealth and vault activity.</p>
+                    <p className="text-gray-400 mt-1">Snapshot of your wealth and Savings activity.</p>
                 </div>
             </div>
 

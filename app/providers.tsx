@@ -55,7 +55,7 @@ export const flareCoston2 = defineChain({
 });
 
 export const wagmiConfig = getDefaultConfig({
-    appName: 'SafeVault',
+    appName: 'Savique',
     projectId: 'd76edd2ec72490269459a792d70e84fc', // Using the provided Project ID
     chains: [flareCoston2, flare],
     transports: {
