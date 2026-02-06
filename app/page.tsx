@@ -39,7 +39,7 @@ export default function LandingPage() {
                     <div className="flex items-center gap-3">
                         <div className="relative w-8 h-8 rounded-lg overflow-hidden flex-shrink-0">
                             <Image
-                                src="/logo.png"
+                                src="/logo3.png"
                                 alt="Savique Logo"
                                 fill
                                 className="object-contain"

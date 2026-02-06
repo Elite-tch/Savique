@@ -121,7 +121,7 @@ function SidebarContent({ pathname, onNavigate }: { pathname: string; onNavigate
                 <div className="h-20 flex items-center gap-3 px-6 border-b border-white/5">
                     <div className="relative w-8 h-8 rounded-lg overflow-hidden flex-shrink-0">
                         <Image
-                            src="/logo.png"
+                            src="/logo3.png"
                             alt="SafeVault Logo"
                             fill
                             className="object-contain"

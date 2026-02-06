@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { useReadContract, useWriteContract, useWaitForTransactionReceipt, useAccount } from "wagmi";
 import { VAULT_ABI, ERC20_ABI, CONTRACTS } from "@/lib/contracts";
@@ -13,7 +13,7 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { VaultBreakModal } from "@/components/VaultBreakModal";
 import { useProofRails } from "@proofrails/sdk/react";
-import { saveReceipt, getVaultByAddress, SavedVault, updateReceipt, saveVault } from "@/lib/receiptService";
+import { saveReceipt, getVaultByAddress, SavedVault, updateReceipt, saveVault, getReceiptsByVault, Receipt } from "@/lib/receiptService";
 import { createNotification } from "@/lib/notificationService";
 import { Progress } from "../../../../components/ui/progress";
 import { Loader2, Plus, ArrowUpCircle } from "lucide-react";
@@ -61,7 +61,9 @@ function useCountdown(targetDate: Date) {
 export default function VaultDetailPage() {
     const params = useParams();
     const router = useRouter();
+    const searchParams = useSearchParams();
     const address = params?.address as `0x${string}`;
+    const returnTab = searchParams.get('tab') || 'active';
 
     const [quote, setQuote] = useState("");
     const [isBreakModalOpen, setIsBreakModalOpen] = useState(false);
@@ -82,12 +84,18 @@ export default function VaultDetailPage() {
     const [topUpAmount, setTopUpAmount] = useState("");
     const [topUpStep, setTopUpStep] = useState<'idle' | 'approving' | 'depositing' | 'done'>('idle');
     const [topUpTxHash, setTopUpTxHash] = useState<`0x${string}` | undefined>(undefined);
+    const [withdrawalReceipt, setWithdrawalReceipt] = useState<Receipt | null>(null);
 
     useEffect(() => {
         const fetchVault = async () => {
             if (address) {
                 const data = await getVaultByAddress(address);
                 setVaultData(data);
+
+                // Fetch receipts to find withdrawal info
+                const receipts = await getReceiptsByVault(address);
+                const wr = receipts.find(r => r.type === 'completed' || r.type === 'breaked');
+                if (wr) setWithdrawalReceipt(wr);
             }
         };
         fetchVault();
@@ -147,7 +155,11 @@ export default function VaultDetailPage() {
     // Handle Write Error & Loading Dismissal
     useEffect(() => {
         if (writeError) {
-            if (toastId.current) toast.dismiss(toastId.current);
+            console.error("Write error:", writeError);
+            if (toastId.current) {
+                toast.dismiss(toastId.current);
+                toastId.current = null;
+            }
             toast.error(`Transaction Failed: ${writeError.message.split('\n')[0]}`, toastStyle);
             setTopUpStep('idle');
         }
@@ -158,7 +170,10 @@ export default function VaultDetailPage() {
     useEffect(() => {
         if (confirmError) {
             console.error("Confirmation Error Details:", confirmError);
-            if (toastId.current) toast.dismiss(toastId.current);
+            if (toastId.current) {
+                toast.dismiss(toastId.current);
+                toastId.current = null;
+            }
             // Show the actual error to help debugging
             const errMsg = confirmError instanceof Error ? confirmError.message.split('\n')[0] : "Transaction Confirmation Failed";
             toast.error(errMsg, toastStyle);
@@ -185,6 +200,10 @@ export default function VaultDetailPage() {
             // Check for reverted status
             if (receipt.status === 'reverted') {
                 console.error("Transaction Reverted:", receipt.transactionHash);
+                if (toastId.current) {
+                    toast.dismiss(toastId.current);
+                    toastId.current = null;
+                }
                 toast.error("Transaction Reverted on-chain. Please check your balance and try again.", toastStyle);
                 setTopUpStep('idle');
                 lastProcessedHash.current = receipt.transactionHash; // Mark as seen so we don't repeat the error toast
@@ -433,7 +452,7 @@ export default function VaultDetailPage() {
         <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in duration-500">
             {/* Header */}
             <div className="flex items-center gap-4">
-                <Link href="/dashboard/savings">
+                <Link href={`/dashboard/savings?tab=${returnTab}`}>
                     <Button variant="ghost" size="icon" className="rounded-full hover:bg-white/10">
                         <ArrowLeft className="w-5 h-5 text-gray-400" />
                     </Button>
@@ -441,8 +460,11 @@ export default function VaultDetailPage() {
                 <div>
                     <h1 className="text-2xl font-bold text-white flex items-center gap-2">
                         {purpose || "Vault Details"}
-                        <span className={`px-2 py-0.5 rounded text-xs border ${isLocked ? 'bg-orange-500/10 border-orange-500/20 text-orange-500' : 'bg-green-500/10 border-green-500/20 text-green-500'}`}>
-                            {isLocked ? "Locked" : "Active"}
+                        <span className={`px-2 py-0.5 rounded text-xs border ${withdrawalReceipt?.type === 'breaked'
+                            ? 'bg-red-500/10 border-red-500/20 text-red-500'
+                            : 'bg-green-500/10 border-green-500/20 text-green-500'
+                            }`}>
+                            {parseFloat(balance) <= 0 ? (withdrawalReceipt?.type === 'breaked' ? 'Broken' : 'Completed') : (isLocked ? "Locked" : "Active")}
                         </span>
                     </h1>
                 </div>
@@ -455,7 +477,7 @@ export default function VaultDetailPage() {
                     <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
 
                     <div className="relative z-10 flex flex-col items-center justify-center text-center h-full py-8 space-y-6">
-                        {isLocked ? (
+                        {parseFloat(balance) > 0 && isLocked ? (
                             <>
                                 <div className="w-20 h-20 bg-orange-500/10 rounded-full flex items-center justify-center border border-orange-500/20 shadow-[0_0_30px_rgba(249,115,22,0.15)]">
                                     <Lock className="w-10 h-10 text-orange-500" />
@@ -519,13 +541,17 @@ export default function VaultDetailPage() {
                             </>
                         ) : (
                             <>
-                                <div className="w-20 h-20 bg-green-500/10 rounded-full flex items-center justify-center border border-green-500/20 shadow-[0_0_30px_rgba(34,197,94,0.15)]">
-                                    <Unlock className="w-10 h-10 text-green-500" />
+                                <div className={`w-20 h-20 ${withdrawalReceipt?.type === 'breaked' ? 'bg-red-500/10 border-red-500/20' : 'bg-[#E62058]/10 border-[#E62058]/20'} rounded-full flex items-center justify-center border shadow-lg`}>
+                                    {withdrawalReceipt?.type === 'breaked' ? <ShieldCheck className="w-10 h-10 text-red-500" /> : <Unlock className="w-10 h-10 text-[#E62058]" />}
                                 </div>
                                 <div>
-                                    <h2 className="text-4xl font-bold text-white mb-2">Goal Achieved!</h2>
+                                    <h2 className="text-4xl font-bold text-white mb-2">
+                                        {withdrawalReceipt?.type === 'breaked' ? 'Vault Closed' : 'Goal Achieved!'}
+                                    </h2>
                                     <p className="text-zinc-400 max-w-sm mx-auto">
-                                        You have successfully completed your savings goal. Your funds are ready for withdrawal.
+                                        {withdrawalReceipt?.type === 'breaked'
+                                            ? 'This vault was closed early. Your principal (after penalty) has been returned to your wallet.'
+                                            : 'You have successfully completed your savings goal. Your funds have been withdrawn.'}
                                     </p>
                                 </div>
                             </>
@@ -538,11 +564,26 @@ export default function VaultDetailPage() {
                     {/* Balance Card */}
                     <Card className="p-6 bg-zinc-900/50 border-zinc-800">
                         <div className="flex items-start justify-between mb-4">
-                            <div>
-                                <p className="text-sm text-zinc-500 mb-1">Total Principal</p>
-                                <h3 className="text-2xl font-bold text-white flex items-baseline gap-1">
-                                    {parseFloat(balance).toFixed(2)} <span className="text-sm font-normal text-zinc-500">USDT0</span>
-                                </h3>
+                            <div className="w-full">
+                                <p className="text-sm text-zinc-500 mb-1">
+                                    {parseFloat(balance) <= 0 ? "Total Withdrawn" : "Total Savings"}
+                                </p>
+                                <div className="space-y-2">
+                                    <h3 className="text-2xl font-bold text-white flex items-baseline gap-1">
+                                        {parseFloat(balance) > 0
+                                            ? parseFloat(balance).toFixed(2)
+                                            : (withdrawalReceipt ? withdrawalReceipt.amount : "0.00")
+                                        } <span className="text-sm font-normal text-zinc-500">USDT0</span>
+                                    </h3>
+
+                                    {/* Penalty Indicator for Broken Vaults */}
+                                    {withdrawalReceipt?.penalty && parseFloat(withdrawalReceipt.penalty) > 0 && (
+                                        <div className="flex items-center gap-2 text-red-500/80 text-[10px] font-bold uppercase tracking-wider">
+                                            <AlertTriangle className="w-3 h-3" />
+                                            Penalty Applied: -{withdrawalReceipt.penalty} USDT0
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </Card>
@@ -556,7 +597,11 @@ export default function VaultDetailPage() {
 
                     {/* Actions */}
                     <div className="space-y-3 pt-2">
-                        {isLocked ? (
+                        {parseFloat(balance) <= 0 ? (
+                            <Button disabled className="w-full bg-zinc-800/50 text-zinc-500 border border-zinc-700/30 cursor-not-allowed">
+                                Vault Inactive
+                            </Button>
+                        ) : isLocked ? (
                             <>
                                 {isTopUpMode ? (
                                     <motion.div
@@ -619,14 +664,10 @@ export default function VaultDetailPage() {
                                     Break Vault Early
                                 </Button>
                             </>
-                        ) : parseFloat(balance) <= 0 ? (
-                            <Button disabled className="w-full bg-zinc-800 text-zinc-500 border border-zinc-700/50 cursor-not-allowed">
-                                Vault Empty
-                            </Button>
                         ) : (
                             <Button
                                 size="lg"
-                                className="w-full bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-900/20"
+                                className="w-full bg-[#E62058] hover:bg-[#E62058]/90 text-white shadow-lg shadow-primary/20"
                                 onClick={handleWithdrawUnlocked}
                                 disabled={isWithdrawPending || isConfirming}
                             >

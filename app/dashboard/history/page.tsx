@@ -10,6 +10,8 @@ import { getReceiptsByWallet, Receipt, saveReceipt, getVaultByAddress, SavedVaul
 import { StatementExportModal } from "@/components/StatementExportModal";
 import { jsPDF } from "jspdf";
 import { toast } from "sonner";
+import { generateReceiptPDF } from "../../../lib/pdfGenerator";
+import { saveAs } from "file-saver";
 
 export default function HistoryPage() {
     const { address: currentAddress, isConnected, isConnecting, isReconnecting } = useAccount();
@@ -20,172 +22,19 @@ export default function HistoryPage() {
     const [isGeneratingReceiptId, setIsGeneratingReceiptId] = useState<string | null>(null);
     const [isStatementModalOpen, setIsStatementModalOpen] = useState(false);
 
-    const generatePDF = (receipt: Receipt) => {
+    const generatePDF = async (receipt: Receipt) => {
         setIsGeneratingReceiptId(receipt.id || null);
         const toastId = toast.loading("Preparing your receipt...");
 
-        const doc = new jsPDF({
-            orientation: "portrait",
-            unit: "mm",
-            format: "a4"
-        });
-
-        const primaryColor = "#F97316"; // Orange-500
-        const darkColor = "#18181B"; // Zinc-900
-        const lightColor = "#71717A"; // Zinc-400
-
-        const createPDF = (qrImageData?: string) => {
-            try {
-                // Background / Border
-                doc.setDrawColor(228, 228, 231); // Border color
-                doc.rect(5, 5, 200, 287);
-
-                // Header
-                doc.setFillColor(darkColor);
-                doc.rect(5, 5, 200, 40, "F");
-
-                doc.setTextColor(255, 255, 255);
-                doc.setFontSize(24);
-                doc.setFont("helvetica", "bold");
-                doc.text("Savique", 15, 22);
-
-                doc.setFontSize(10);
-                doc.setFont("helvetica", "normal");
-                doc.text("DECENTRALIZED SAVINGS RECEIPT", 15, 32);
-
-                doc.setFontSize(12);
-                doc.text(`ID: ${receipt.id?.slice(0, 8).toUpperCase()}`, 160, 22);
-
-                // Content Starts
-                let y = 60;
-                doc.setTextColor(darkColor);
-                doc.setFontSize(18);
-                doc.text(receipt.purpose || "Saving Transaction", 15, y);
-                y += 10;
-
-                // Divider
-                doc.setDrawColor(primaryColor);
-                doc.setLineWidth(1);
-                doc.line(15, y, 60, y);
-                y += 15;
-
-                // Details Grid
-                doc.setFontSize(10);
-                doc.setTextColor(lightColor);
-                doc.text("TYPE", 15, y);
-                doc.text("TIMESTAMP", 70, y);
-                doc.text("STATUS", 150, y);
-
-                y += 7;
-                doc.setFontSize(12);
-                doc.setTextColor(darkColor);
-
-                // Determine descriptive type
-                let typeLabel = "INITIAL DEPOSIT";
-                if (receipt.type === 'completed') typeLabel = "WITHDRAWAL";
-                if (receipt.type === 'breaked') {
-                    typeLabel = "BREAK EARLY";
-                } else if (receipt.type === 'created') {
-                    if (receipt.purpose.toLowerCase().includes('target reached')) {
-                        typeLabel = "GOAL REACHED";
-                    } else if (receipt.purpose.toLowerCase().includes('contributed')) {
-                        typeLabel = "CONTRIBUTION";
-                    }
-                }
-
-                doc.text(typeLabel, 15, y);
-                doc.text(new Date(receipt.timestamp).toLocaleString(), 70, y);
-                doc.text(receipt.verified ? "VERIFIED" : "PENDING", 150, y);
-
-                y += 20;
-                doc.setFontSize(10);
-                doc.setTextColor(lightColor);
-                doc.text("AMOUNT", 15, y);
-                if (receipt.penalty) doc.text("PENALTY APPLIED", 70, y);
-
-                y += 7;
-                doc.setFontSize(16);
-                doc.setFont("helvetica", "bold");
-                doc.setTextColor(primaryColor);
-                doc.text(`${receipt.amount} USDT0`, 15, y);
-                if (receipt.penalty) {
-                    doc.setTextColor("#EF4444"); // Red-500
-                    doc.text(`${receipt.penalty} USDT0`, 70, y);
-                }
-
-                y += 25;
-                // Blockchain Info Card
-                doc.setFillColor(244, 244, 245); // Zinc-100
-                doc.rect(15, y - 5, 180, 45, "F");
-
-                doc.setFontSize(10);
-                doc.setTextColor(lightColor);
-                doc.text("BLOCKCHAIN PROOF", 22, y + 5);
-
-                doc.setFontSize(9);
-                doc.setFont("courier", "normal");
-                doc.setTextColor(darkColor);
-                doc.text(`WALLET: ${receipt.walletAddress}`, 22, y + 15);
-                const truncatedHash = receipt.txHash.length > 50 ? receipt.txHash.slice(0, 50) + "..." : receipt.txHash;
-                doc.text(`TX HASH: ${truncatedHash}`, 22, y + 25);
-                doc.text(`NETWORK: Flare Coston2`, 22, y + 35);
-
-                y += 60;
-                // ProofRails Section
-                if (receipt.proofRailsId) {
-                    doc.setFont("helvetica", "bold");
-                    doc.setFontSize(12);
-                    doc.setTextColor(darkColor);
-                    doc.text("ProofRails Verification", 15, y);
-
-                    doc.setFont("helvetica", "normal");
-                    doc.setFontSize(9);
-                    doc.setTextColor(lightColor);
-                    doc.text(`Receipt ID: ${receipt.proofRailsId}`, 15, y + 7);
-
-                    if (qrImageData) {
-                        doc.addImage(qrImageData, "PNG", 150, y - 5, 35, 35);
-                    }
-
-                    doc.setTextColor(primaryColor);
-                    doc.text("Scan to verify on-chain authenticity", 15, y + 15);
-                }
-
-                // Footer
-                doc.setFontSize(8);
-                doc.setTextColor(lightColor);
-                doc.text("This receipt is cryptographically generated and verified by the ProofRails protocol.", 105, 280, { align: "center" });
-                doc.text("Visit safira.app for more info.", 105, 285, { align: "center" });
-
-                doc.save(`Savique-Receipt-${receipt.id?.slice(0, 8)}.pdf`);
-                toast.success("Receipt downloaded!", { id: toastId });
-            } catch (error) {
-                console.error("PDF generation failed", error);
-                toast.error("Generation failed", { id: toastId });
-            } finally {
-                setIsGeneratingReceiptId(null);
-            }
-        };
-
-        if (receipt.proofRailsId) {
-            const img = new Image();
-            img.crossOrigin = "Anonymous";
-            img.src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://proofrails-clone-middleware.onrender.com/receipt/${receipt.proofRailsId}`;
-            img.onload = () => {
-                const canvas = document.createElement("canvas");
-                canvas.width = img.width;
-                canvas.height = img.height;
-                const ctx = canvas.getContext("2d");
-                ctx?.drawImage(img, 0, 0);
-                const dataURL = canvas.toDataURL("image/png");
-                createPDF(dataURL);
-            };
-            img.onerror = () => {
-                console.warn("QR loader error");
-                createPDF();
-            };
-        } else {
-            createPDF();
+        try {
+            const blob = await generateReceiptPDF(receipt);
+            saveAs(blob, `Savique-Receipt-${receipt.id?.slice(0, 8)}.pdf`);
+            toast.success("Receipt downloaded!", { id: toastId });
+        } catch (error) {
+            console.error("PDF generation failed", error);
+            toast.error("Generation failed", { id: toastId });
+        } finally {
+            setIsGeneratingReceiptId(null);
         }
     };
 
@@ -292,7 +141,7 @@ export default function HistoryPage() {
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: index * 0.1 }}
                         >
-                            <Card className="p-6 hover:border-primary/50 transition-all">
+                            <Card className="p-6 bg-zinc-900/40 border-zinc-800/50 hover:border-zinc-700 transition-all">
                                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                                     <div className="flex items-start gap-4">
 

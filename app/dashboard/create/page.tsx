@@ -77,7 +77,13 @@ export default function CreatePersonalVault() {
     };
 
     const { writeContract, error: writeError } = useWriteContract();
-    const { isLoading: isConfirming, isSuccess, data: receipt } = useWaitForTransactionReceipt({ hash: txHash });
+    const {
+        isLoading: isConfirming,
+        isSuccess,
+        isError: isConfirmError,
+        error: confirmError,
+        data: receipt
+    } = useWaitForTransactionReceipt({ hash: txHash });
 
     // ProofRails Integration
     const sdk = useProofRails();
@@ -159,12 +165,28 @@ export default function CreatePersonalVault() {
     useEffect(() => {
         if (writeError) {
             console.error("Write error:", writeError);
+            if (toastId.current) toast.dismiss(toastId.current);
             toast.error(`Transaction Failed: ${writeError.message.split('\n')[0]}`, toastStyle);
-            // Reset to idle or previous step? allows retry
             setTxHash(undefined);
-            // keep current step to retry
+            setCurrentStep('idle');
         }
     }, [writeError]);
+
+    // Handle Network/On-chain Revert Errors
+    useEffect(() => {
+        if (isConfirmError || (isSuccess && receipt?.status === 'reverted')) {
+            console.error("Transaction confirmation error:", confirmError || "Reverted");
+            if (toastId.current) toast.dismiss(toastId.current);
+
+            const errMsg = confirmError
+                ? (confirmError as any).shortMessage || confirmError.message.split('\n')[0]
+                : "Transaction Reverted on-chain";
+
+            toast.error(`Confirmation Failed: ${errMsg}`, toastStyle);
+            setTxHash(undefined);
+            setCurrentStep('idle');
+        }
+    }, [isConfirmError, confirmError, isSuccess, receipt]);
 
     const triggerCreateVault = () => {
         const val = customDuration ? parseInt(customDuration) : parseInt(formData.duration);

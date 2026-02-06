@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Bell, Check, Info, AlertTriangle, CheckCircle, ExternalLink } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAccount } from 'wagmi';
-import { AppNotification, subscribeToNotifications, markAsRead } from '@/lib/notificationService';
+import { AppNotification, subscribeToNotifications, markAsRead, markAllAsRead } from '@/lib/notificationService';
 import Link from 'next/link';
 
 export function NotificationBell() {
@@ -39,6 +39,13 @@ export function NotificationBell() {
         markAsRead(id);
     };
 
+    const handleReadAll = () => {
+        const unreadIds = notifications.filter(n => !n.read).map(n => n.id);
+        if (unreadIds.length > 0) {
+            markAllAsRead(unreadIds);
+        }
+    };
+
     const getIcon = (type: string) => {
         switch (type) {
             case 'success': return <CheckCircle className="w-4 h-4 text-orange-400" />;
@@ -73,12 +80,22 @@ export function NotificationBell() {
                         transition={{ duration: 0.2 }}
                         className="absolute  right-[-80px] md:right-0  mt-2 w-80 md:w-96 bg-black backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden"
                     >
-                        <div className="p-4 border-b border-white/10 flex justify-between items-center">
-                            <h3 className="font-semibold text-white">Notifications</h3>
+                        <div className="p-4 border-b border-white/10 flex justify-between items-center bg-zinc-950/50">
+                            <div className="flex items-center gap-2">
+                                <h3 className="font-semibold text-white">Notifications</h3>
+                                {unreadCount > 0 && (
+                                    <span className="text-[10px] bg-primary/20 text-primary px-1.5 py-0.5 rounded-full font-bold">
+                                        {unreadCount} NEW
+                                    </span>
+                                )}
+                            </div>
                             {unreadCount > 0 && (
-                                <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full">
-                                    {unreadCount} New
-                                </span>
+                                <button
+                                    onClick={handleReadAll}
+                                    className="text-[10px] font-bold text-zinc-500 hover:text-white transition-colors uppercase tracking-wider"
+                                >
+                                    Read All
+                                </button>
                             )}
                         </div>
 

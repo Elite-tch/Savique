@@ -88,6 +88,35 @@ export async function getReceiptsByWallet(walletAddress: string): Promise<Receip
 }
 
 /**
+ * Get all receipts for a specific vault address
+ */
+export async function getReceiptsByVault(vaultAddress: string): Promise<Receipt[]> {
+    try {
+        const receiptsRef = collection(db, RECEIPTS_COLLECTION);
+        const q = query(
+            receiptsRef,
+            where('vaultAddress', '==', vaultAddress.toLowerCase()),
+            orderBy('timestamp', 'desc')
+        );
+
+        const querySnapshot = await getDocs(q);
+        const receipts: Receipt[] = [];
+
+        querySnapshot.forEach((doc) => {
+            receipts.push({
+                id: doc.id,
+                ...doc.data()
+            } as Receipt);
+        });
+
+        return receipts;
+    } catch (error) {
+        console.error('[Firebase] Error loading receipts by vault:', error);
+        throw error;
+    }
+}
+
+/**
  * Migrate receipts from localStorage to Firestore
  */
 export async function migrateLocalStorageToFirestore(walletAddress: string): Promise<number> {

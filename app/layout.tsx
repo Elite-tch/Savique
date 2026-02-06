@@ -44,7 +44,7 @@ export const metadata: Metadata = {
     type: "website",
     images: [
       {
-        url: "/logo.png", // Ensure this exists or use a generic one
+        url: "/logo3.png", // Ensure this exists or use a generic one
         width: 1200,
         height: 630,
         alt: "Savique - Smart Commitment Protocol",

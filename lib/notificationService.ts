@@ -68,6 +68,20 @@ export async function markAsRead(notificationId: string) {
 }
 
 /**
+ * Mark all unread notifications as read.
+ */
+export async function markAllAsRead(notificationIds: string[]) {
+    try {
+        await Promise.all(notificationIds.map(id => {
+            const docRef = doc(db, NOTIFICATION_COLLECTION, id);
+            return updateDoc(docRef, { read: true });
+        }));
+    } catch (error) {
+        console.error('[Notification] Error marking all as read:', error);
+    }
+}
+
+/**
  * Subscribe to notifications for a user (Real-time).
  * Returns an unsubscribe function.
  */
