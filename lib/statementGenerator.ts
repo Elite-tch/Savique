@@ -119,11 +119,25 @@ export function generateStatement(data: StatementData) {
         }
 
         const date = new Date(receipt.timestamp).toLocaleDateString();
-        const type = receipt.type.toUpperCase();
-        const purpose = receipt.purpose.substring(0, 20);
+
+        // Determine descriptive type for professional statement
+        let typeLabel = "INITIAL DEPOSIT";
+        if (receipt.type === 'completed') typeLabel = "WITHDRAWAL";
+        if (receipt.type === 'breaked') {
+            typeLabel = "BREAK EARLY";
+        } else if (receipt.type === 'created') {
+            if (receipt.purpose.toLowerCase().includes('target reached')) {
+                typeLabel = "GOAL REACHED";
+            } else if (receipt.purpose.toLowerCase().includes('contributed')) {
+                typeLabel = "CONTRIBUTION";
+            }
+        }
+
+        const type = typeLabel;
+        const purpose = receipt.purpose.substring(0, 25);
         const amount = parseFloat(receipt.amount);
 
-        // Classify transaction
+        // Classify transaction for totals
         if (receipt.type === 'created') {
             totalDeposits += amount;
         } else {
@@ -144,13 +158,13 @@ export function generateStatement(data: StatementData) {
         doc.setTextColor(darkColor);
         doc.text(date, 20, y);
 
-        // Type with color
+        // Type with color (Deposit = Green-ish blue, Withdrawal = Standard green, Break = Red)
         if (receipt.type === 'created') {
-            doc.setTextColor("#2563EB"); // Blue
+            doc.setTextColor("#0369A1"); // Sky-700
         } else if (receipt.type === 'completed') {
-            doc.setTextColor("#16A34A"); // Green
+            doc.setTextColor("#15803D"); // Green-700
         } else {
-            doc.setTextColor("#DC2626"); // Red
+            doc.setTextColor("#DC2626"); // Red-600
         }
         doc.text(type, 55, y);
 

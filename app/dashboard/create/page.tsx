@@ -8,14 +8,14 @@ import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useWriteContract, useWaitForTransactionReceipt, useAccount, useBalance, useReadContract, usePublicClient } from "wagmi";
-import { CONTRACTS, VAULT_FACTORY_ABI, ERC20_ABI, VAULT_ABI, KINETIC_CONTRACTS, KINETIC_ERC20_ABI, TOKEN_DECIMALS, MAX_UINT256, COMPTROLLER_ABI } from "@/lib/contracts";
+import { CONTRACTS, VAULT_FACTORY_ABI, ERC20_ABI, VAULT_ABI } from "@/lib/contracts";
 import { toast } from "sonner";
 import { parseUnits, formatUnits, decodeEventLog } from "viem";
 import { useProofRails } from "@proofrails/sdk/react";
 import { saveReceipt, saveVault } from "@/lib/receiptService";
 import { createNotification } from "@/lib/notificationService";
 
-
+const MAX_UINT256 = BigInt("115792089237316195423570985008687907853269984665640564039457584007913129639935");
 
 export default function CreatePersonalVault() {
     const router = useRouter();
@@ -51,6 +51,7 @@ export default function CreatePersonalVault() {
     const [formData, setFormData] = useState({
         purpose: "",
         amount: "",
+        targetAmount: "", // New: Sinking Fund Goal
         duration: "30",
         durationUnit: "days" as "minutes" | "hours" | "days"
     });
@@ -60,7 +61,7 @@ export default function CreatePersonalVault() {
     const toastId = useRef<string | number | null>(null);
 
     // Multi-step state
-    type Step = 'idle' | 'approving' | 'creating' | 'approving_kinetic' | 'entering_kinetic_market' | 'depositing_kinetic' | 'generating_proof' | 'done';
+    type Step = 'idle' | 'approving' | 'creating' | 'generating_proof' | 'done';
     const [currentStep, setCurrentStep] = useState<Step>('idle');
     const [createdVaultAddress, setCreatedVaultAddress] = useState<`0x${string}` | null>(null);
     const [txHash, setTxHash] = useState<`0x${string}` | undefined>(undefined);
@@ -75,8 +76,7 @@ export default function CreatePersonalVault() {
         }
     };
 
-    const { writeContract, error: writeError, isPending: isSigning } = useWriteContract();
-    const processedHashes = useRef<Set<string>>(new Set());
+    const { writeContract, error: writeError } = useWriteContract();
     const { isLoading: isConfirming, isSuccess, data: receipt } = useWaitForTransactionReceipt({ hash: txHash });
 
     // ProofRails Integration
@@ -85,9 +85,7 @@ export default function CreatePersonalVault() {
     // Reset loop when transaction succeeds
     useEffect(() => {
         const processStep = async () => {
-            if (isSuccess && receipt && !processedHashes.current.has(receipt.transactionHash)) {
-                processedHashes.current.add(receipt.transactionHash);
-
+            if (isSuccess && receipt) {
                 if (currentStep === 'approving') {
                     // 1. Approved - Now Create & Deposit
                     toast.dismiss(toastId.current as string);
@@ -99,10 +97,11 @@ export default function CreatePersonalVault() {
                     setCurrentStep('creating');
                     triggerCreateVault();
                 } else if (currentStep === 'creating') {
-                    // 2. Created & Deposited - Find Address & Transition to Kinetic
+                    // 2. Created & Deposited - Find Address & Generate Proof
                     toast.dismiss(toastId.current as string);
 
                     try {
+                        // Find the PersonalVaultCreated event in the logs
                         let newVault: string | undefined;
 
                         for (const log of receipt.logs) {
@@ -116,10 +115,13 @@ export default function CreatePersonalVault() {
                                     newVault = (decoded.args as any).vaultAddress;
                                     break;
                                 }
-                            } catch (e) { }
+                            } catch (e) {
+                                // Not our event, ignore
+                            }
                         }
 
                         if (!newVault) {
+                            // Fallback to getUserVaults if event parsing fails
                             const userVaults = await publicClient!.readContract({
                                 address: CONTRACTS.coston2.VaultFactory,
                                 abi: VAULT_FACTORY_ABI,
@@ -132,38 +134,10 @@ export default function CreatePersonalVault() {
                         if (newVault) {
                             setCreatedVaultAddress(newVault as `0x${string}`);
                             toast.success("Savings Created & Funded!", toastStyle);
-
-                            // Transition to Kinetic Deposit
-                            toast.dismiss(toastId.current as string);
                             setTxHash(undefined);
-
-                            // Give RPC a heartbeat to sync
-                            await new Promise(resolve => setTimeout(resolve, 1000));
-
-                            // Explicitly check allowance via publicClient for fresh data
-                            const freshAllowance = await publicClient!.readContract({
-                                address: CONTRACTS.coston2.USDTToken,
-                                abi: ERC20_ABI,
-                                functionName: 'allowance',
-                                args: [address as `0x${string}`, KINETIC_CONTRACTS.kUSDT0]
-                            });
-
-                            const amountUnits = parseUnits(formData.amount, TOKEN_DECIMALS.USDT0);
-                            if (freshAllowance < amountUnits) {
-                                setCurrentStep('approving_kinetic');
-                                toastId.current = toast.loading("Approving Kinetic...", toastStyle);
-
-                                writeContract({
-                                    address: CONTRACTS.coston2.USDTToken,
-                                    abi: ERC20_ABI,
-                                    functionName: "approve",
-                                    args: [KINETIC_CONTRACTS.kUSDT0, MAX_UINT256]
-                                }, {
-                                    onSuccess: (hash) => setTxHash(hash)
-                                });
-                            } else {
-                                handleKineticMarketEntry();
-                            }
+                            setCurrentStep('generating_proof');
+                            // Pass address directly to avoid state race condition
+                            handleProofGeneration(receipt.transactionHash, newVault);
                         } else {
                             throw new Error("Could not find new savings address");
                         }
@@ -172,48 +146,6 @@ export default function CreatePersonalVault() {
                         toast.error("Created but failed to find address", toastStyle);
                         setCurrentStep('idle');
                     }
-                } else if (currentStep === 'approving_kinetic') {
-                    toast.dismiss(toastId.current as string);
-                    toast.success("Kinetic Approved!", toastStyle);
-                    setTxHash(undefined);
-
-                    // Verifying...
-                    toastId.current = toast.loading("Verifying Network State...", toastStyle);
-
-                    let verified = false;
-                    for (let i = 0; i < 5; i++) {
-                        await new Promise(resolve => setTimeout(resolve, 2000));
-                        const freshAllowance = await publicClient!.readContract({
-                            address: CONTRACTS.coston2.USDTToken,
-                            abi: ERC20_ABI,
-                            functionName: 'allowance',
-                            args: [address as `0x${string}`, KINETIC_CONTRACTS.kUSDT0]
-                        });
-
-                        if (freshAllowance >= parseUnits(formData.amount, TOKEN_DECIMALS.USDT0)) {
-                            verified = true;
-                            break;
-                        }
-                    }
-
-                    if (verified) {
-                        handleKineticMarketEntry();
-                    } else {
-                        toast.dismiss(toastId.current as string);
-                        toast.error("Network sync slow. Please click 'Retry' manually.", toastStyle);
-                        setCurrentStep('entering_kinetic_market');
-                    }
-                } else if (currentStep === 'entering_kinetic_market') {
-                    toast.dismiss(toastId.current as string);
-                    toast.success("Market Entered!", toastStyle);
-                    setTxHash(undefined);
-                    handleKineticMint();
-                } else if (currentStep === 'depositing_kinetic') {
-                    toast.dismiss(toastId.current as string);
-                    toast.success("Deposited to Kinetic!", toastStyle);
-                    setTxHash(undefined);
-                    setCurrentStep('generating_proof');
-                    handleProofGeneration(receipt.transactionHash);
                 }
             }
         };
@@ -245,7 +177,7 @@ export default function CreatePersonalVault() {
 
         const unlockTimestamp = Math.floor(Date.now() / 1000) + seconds;
         const penaltyBps = FIXED_PENALTY * 100;
-        const amountUnits = parseUnits(formData.amount, TOKEN_DECIMALS.USDT0);
+        const amountUnits = parseUnits(formData.amount, decimals || 18);
 
         writeContract({
             address: CONTRACTS.coston2.VaultFactory,
@@ -257,149 +189,21 @@ export default function CreatePersonalVault() {
         });
     };
 
-    const handleKineticMarketEntry = async () => {
-        if (isSigning) return;
-
-        try {
-            const isMember = await publicClient!.readContract({
-                address: KINETIC_CONTRACTS.Comptroller as `0x${string}`,
-                abi: COMPTROLLER_ABI,
-                functionName: "checkMembership",
-                args: [address!, KINETIC_CONTRACTS.kUSDT0 as `0x${string}`]
-            });
-
-            if (isMember) {
-                handleKineticMint();
-                return;
-            }
-        } catch (e) {
-            console.log("Market check failed, proceeding to entry", e);
-        }
-
-        setCurrentStep('entering_kinetic_market');
-        toastId.current = toast.loading("Entering Kinetic Market...", toastStyle);
-
-        writeContract({
-            address: KINETIC_CONTRACTS.Comptroller as `0x${string}`,
-            abi: COMPTROLLER_ABI,
-            functionName: "enterMarkets",
-            args: [[KINETIC_CONTRACTS.kUSDT0 as `0x${string}`]]
-        }, {
-            onSuccess: (hash) => setTxHash(hash),
-            onError: () => setCurrentStep('entering_kinetic_market')
-        });
-    };
-
-    const handleKineticMint = () => {
-        if (isSigning) return;
-        const amountUnits = parseUnits(formData.amount, TOKEN_DECIMALS.USDT0);
-        setCurrentStep('depositing_kinetic');
-        toastId.current = toast.loading("Confirming Kinetic Deposit...", toastStyle);
-
-        writeContract({
-            address: KINETIC_CONTRACTS.kUSDT0 as `0x${string}`,
-            abi: KINETIC_ERC20_ABI,
-            functionName: "mint",
-            args: [amountUnits]
-        }, {
-            onSuccess: (hash) => setTxHash(hash),
-            onError: (err: any) => {
-                console.error("Kinetic Mint Err:", err);
-                if (err.message?.includes("allowance")) {
-                    toast.error("Allowance not detected yet. Retrying in 3s...", toastStyle);
-                    setTimeout(() => handleKineticMint(), 3000);
-                } else {
-                    setCurrentStep('depositing_kinetic');
-                }
-            }
-        });
-    };
-
-    const debugKineticState = async () => {
-        if (!address) return;
-        console.log("=== KINETIC DEBUG ===");
-        try {
-            const underlying = await publicClient!.readContract({
-                address: KINETIC_CONTRACTS.kUSDT0 as `0x${string}`,
-                abi: KINETIC_ERC20_ABI,
-                functionName: "underlying"
-            });
-            console.log("kUSDT0 Underlying token:", underlying);
-
-            const isMember = await publicClient!.readContract({
-                address: KINETIC_CONTRACTS.Comptroller as `0x${string}`,
-                abi: COMPTROLLER_ABI,
-                functionName: "checkMembership",
-                args: [address!, KINETIC_CONTRACTS.kUSDT0 as `0x${string}`]
-            });
-            console.log("Market membership (isMember):", isMember);
-
-            const usdtAllowance = await publicClient!.readContract({
-                address: CONTRACTS.coston2.USDTToken,
-                abi: ERC20_ABI,
-                functionName: "allowance",
-                args: [address!, KINETIC_CONTRACTS.kUSDT0 as `0x${string}`]
-            });
-            console.log("USDT Allowance to kUSDT0:", formatUnits(usdtAllowance, TOKEN_DECIMALS.USDT0));
-        } catch (e) {
-            console.error("Debug failed:", e);
-        }
-    };
-
-    // Run debug on connection
-    useEffect(() => {
-        if (isConnected && address) {
-            debugKineticState();
-        }
-    }, [isConnected, address]);
-
     const handleCreate = async () => {
         if (!address) return;
 
         try {
-            const amountUnits = parseUnits(formData.amount, TOKEN_DECIMALS.USDT0);
+            const amountUnits = parseUnits(formData.amount, decimals || 18);
 
-            // Handle Retries
-            if (currentStep === 'approving_kinetic') {
-                toastId.current = toast.loading("Retrying Kinetic Approval...", toastStyle);
-                writeContract({
-                    address: CONTRACTS.coston2.USDTToken,
-                    abi: ERC20_ABI,
-                    functionName: "approve",
-                    args: [KINETIC_CONTRACTS.kUSDT0, MAX_UINT256]
-                }, {
-                    onSuccess: (hash) => setTxHash(hash)
-                });
-                return;
-            }
-
-            if (currentStep === 'entering_kinetic_market') {
-                handleKineticMarketEntry();
-                return;
-            }
-
-            if (currentStep === 'depositing_kinetic') {
-                handleKineticMint();
-                return;
-            }
-
-            if (currentStep === 'creating') {
-                triggerCreateVault();
-                return;
-            }
-
-            // Check if approval is needed for Factory
-            const freshAllowance = await publicClient!.readContract({
-                address: CONTRACTS.coston2.USDTToken,
-                abi: ERC20_ABI,
-                functionName: 'allowance',
-                args: [address as `0x${string}`, CONTRACTS.coston2.VaultFactory]
-            });
-
-            if (freshAllowance < amountUnits) {
+            // Check if approval is needed
+            if (!allowance || allowance < amountUnits) {
                 setCurrentStep('approving');
                 toastId.current = toast.loading("Approving USDT...", toastStyle);
 
+                // Approve Max to avoid future approvals? Or just amount.
+                // User asked for "stress" reduction, so Max is better UX but less secure.
+                // Let's approve EXACT amount for now, or MAX if user prefers.
+                // Let's approve MAX to solve "poping up" issue for future.
                 writeContract({
                     address: CONTRACTS.coston2.USDTToken,
                     abi: ERC20_ABI,
@@ -431,7 +235,8 @@ export default function CreatePersonalVault() {
                 owner: address!.toLowerCase(),
                 factoryAddress: CONTRACTS.coston2.VaultFactory,
                 createdAt: Date.now(),
-                purpose: formData.purpose
+                purpose: formData.purpose,
+                targetAmount: formData.targetAmount || formData.amount // Fallback to initial amount if not set
             });
             console.log("✅ Savings saved to registry");
 
@@ -535,23 +340,11 @@ export default function CreatePersonalVault() {
     const unlockDate = new Date(Date.now() + ms);
     const potentialPenalty = formData.amount ? (parseFloat(formData.amount) * FIXED_PENALTY / 100).toFixed(4) : "0";
 
+    // UI Helpers
     const isProcessing = currentStep !== 'idle' && currentStep !== 'done';
-    const isErrorOrWaiting = txHash === undefined && isProcessing && !isConfirming && !isSigning;
-
     const getButtonText = () => {
-        if (isSigning) return "Check Your Wallet...";
-        if (isErrorOrWaiting) {
-            if (currentStep === 'approving_kinetic') return "Retry Kinetic Approval";
-            if (currentStep === 'entering_kinetic_market') return "Retry Market Entry";
-            if (currentStep === 'depositing_kinetic') return "Retry Kinetic Deposit";
-            if (currentStep === 'creating') return "Retry Creating Vault";
-            if (currentStep === 'approving') return "Retry USDT Approval";
-        }
         if (currentStep === 'creating') return "Creating Vault...";
         if (currentStep === 'approving') return "Approving USDT0...";
-        if (currentStep === 'approving_kinetic') return "Approving Kinetic...";
-        if (currentStep === 'entering_kinetic_market') return "Entering Market...";
-        if (currentStep === 'depositing_kinetic') return "Supplying to Kinetic...";
         if (currentStep === 'generating_proof') return "Finalizing Receipt...";
         if (currentStep === 'done') return "Redirecting...";
         return "Create & Lock Funds";
@@ -602,30 +395,52 @@ export default function CreatePersonalVault() {
                             </div>
 
                             {/* Amount */}
-                            <div className="space-y-2">
-                                <label className="text-sm font-semibold text-white flex items-center gap-2">
-                                    <Coins className="w-4 h-4 text-primary" />
-                                    Initial Deposit Amount
-                                </label>
-                                <div className="relative">
-                                    <input
-                                        type="number"
-                                        placeholder="0.00"
-                                        required
-                                        step="0.01"
-                                        min="0.1"
-                                        disabled={isProcessing}
-                                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 pr-20 text-white focus:border-primary/50 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                        value={formData.amount}
-                                        onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                                    />
-                                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">USDT0</span>
+                            <div className="grid md:grid-cols-2 gap-6">
+                                <div className="space-y-2">
+                                    <label className="text-sm font-semibold text-white flex items-center gap-2">
+                                        <Coins className="w-4 h-4 text-primary" />
+                                        Initial Deposit
+                                    </label>
+                                    <div className="relative">
+                                        <input
+                                            type="number"
+                                            placeholder="0.00"
+                                            required
+                                            step="0.01"
+                                            min="0.1"
+                                            disabled={isProcessing}
+                                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 pr-20 text-white focus:border-primary/50 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                            value={formData.amount}
+                                            onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                                        />
+                                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">USDT0</span>
+                                    </div>
+                                    {balance !== undefined && (
+                                        <p className="text-xs text-gray-500 mt-1">
+                                            Available: {formatUnits(balance, decimals || 18)} USDT0
+                                        </p>
+                                    )}
                                 </div>
-                                {balance !== undefined && (
-                                    <p className="text-xs text-gray-500 mt-1">
-                                        Available: {formatUnits(balance, decimals || 18)} USDT0
-                                    </p>
-                                )}
+
+                                <div className="space-y-2">
+                                    <label className="text-sm font-semibold text-white flex items-center gap-2">
+                                        <TrendingUp className="w-4 h-4 text-primary" />
+                                        Target Goal (Optional)
+                                    </label>
+                                    <div className="relative">
+                                        <input
+                                            type="number"
+                                            placeholder={formData.amount || "0.00"}
+                                            step="0.01"
+                                            disabled={isProcessing}
+                                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 pr-20 text-white focus:border-primary/50 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                            value={formData.targetAmount}
+                                            onChange={(e) => setFormData({ ...formData, targetAmount: e.target.value })}
+                                        />
+                                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">USDT0</span>
+                                    </div>
+                                    <p className="text-xs text-gray-500 mt-1">Total you wish to save</p>
+                                </div>
                             </div>
 
                             {/* Lock Duration */}
@@ -747,12 +562,8 @@ export default function CreatePersonalVault() {
                                         <span className={`text-sm ${currentStep === 'approving' ? 'text-primary font-bold' : 'text-gray-400'}`}>1. Approve USDT0</span>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        {currentStep === 'creating' ? <Loader2 className="w-4 h-4 animate-spin text-primary" /> : (['approving_kinetic', 'entering_kinetic_market', 'depositing_kinetic', 'generating_proof', 'done'].includes(currentStep) ? <Check className="w-4 h-4 text-green-500" /> : <div className="w-4 h-4 rounded-full border border-gray-500" />)}
-                                        <span className={`text-sm ${currentStep === 'creating' ? 'text-primary font-bold' : 'text-gray-400'}`}>2. Create Savings</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        {(currentStep === 'approving_kinetic' || currentStep === 'entering_kinetic_market' || currentStep === 'depositing_kinetic') ? <Loader2 className="w-4 h-4 animate-spin text-primary" /> : (['generating_proof', 'done'].includes(currentStep) ? <Check className="w-4 h-4 text-green-500" /> : <div className="w-4 h-4 rounded-full border border-gray-500" />)}
-                                        <span className={`text-sm ${(currentStep === 'approving_kinetic' || currentStep === 'entering_kinetic_market' || currentStep === 'depositing_kinetic') ? 'text-primary font-bold' : 'text-gray-400'}`}>3. Deposit to Kinetic</span>
+                                        {currentStep === 'creating' ? <Loader2 className="w-4 h-4 animate-spin text-primary" /> : ((currentStep === 'generating_proof') ? <Check className="w-4 h-4 text-green-500" /> : <div className="w-4 h-4 rounded-full border border-gray-500" />)}
+                                        <span className={`text-sm ${currentStep === 'creating' ? 'text-primary font-bold' : 'text-gray-400'}`}>2. Create & Deposit</span>
                                     </div>
                                 </div>
                             )}
@@ -760,10 +571,10 @@ export default function CreatePersonalVault() {
                             <Button
                                 type="submit"
                                 size="lg"
-                                className={`w-full text-white font-semibold transition-all ${isErrorOrWaiting ? 'bg-orange-600 hover:bg-orange-700' : 'bg-primary hover:bg-primary/90'}`}
-                                disabled={(isProcessing && !isErrorOrWaiting) || isSigning}
+                                className="w-full bg-primary hover:bg-primary/90 text-white font-semibold"
+                                disabled={isProcessing}
                             >
-                                {(isProcessing && !isErrorOrWaiting) || isSigning ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                                {isProcessing ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                                 {getButtonText()}
                             </Button>
                         </form>

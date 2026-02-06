@@ -6,27 +6,6 @@ export const CONTRACTS = {
     },
 } as const;
 
-export const KINETIC_CONTRACTS = {
-    kUSDT0: "0x2585093A4EABF872fA9E313b66f0B12Ed38954Cf",
-    kUSDC: "0xC23B7fbE7CdAb4bf524b8eA72a7462c8879A99Ac",
-    kSFLR: "0x060573e5f5Aa157B2eAa5eeDBef40605ac3bDEFe",
-    kWETH: "0x9c6bf326fCF1A533AaC0e7289332f4Cb74526EE6",
-    Comptroller: "0xeC7e541375D70c37262f619162502dB9131d6db5",
-} as const;
-
-export const TOKEN_DECIMALS = {
-    USDT0: 6,
-    USDC: 6,
-    SFLR: 18,
-    WETH: 18,
-};
-
-// Maximum uint256 for approvals
-export const MAX_UINT256 = BigInt(
-    "115792089237316195423570985008687907853269984665640564039457584007913129639935"
-);
-
-// -------------------- VaultFactory ABI --------------------
 export const VAULT_FACTORY_ABI = [
     {
         inputs: [
@@ -56,7 +35,6 @@ export const VAULT_FACTORY_ABI = [
     }
 ] as const;
 
-// -------------------- Vault ABI --------------------
 export const VAULT_ABI = [
     {
         inputs: [],
@@ -102,7 +80,6 @@ export const VAULT_ABI = [
     }
 ] as const;
 
-// -------------------- ERC20 ABI --------------------
 export const ERC20_ABI = [
     {
         inputs: [
@@ -137,52 +114,15 @@ export const ERC20_ABI = [
         outputs: [{ name: "", type: "uint8" }],
         stateMutability: "view",
         type: "function"
-    }
-] as const;
-
-// -------------------- Kinetic ABI --------------------
-export const KINETIC_ERC20_ABI = [
-    ...ERC20_ABI,
-    {
-        inputs: [{ name: "amount", type: "uint256" }],
-        name: "mint",
-        outputs: [],
-        stateMutability: "nonpayable",
-        type: "function"
-    },
-    {
-        inputs: [],
-        name: "underlying",
-        outputs: [{ name: "", type: "address" }],
-        stateMutability: "view",
-        type: "function"
-    },
-    {
-        inputs: [{ name: "amount", type: "uint256" }],
-        name: "redeem",
-        outputs: [{ name: "", type: "uint256" }],
-        stateMutability: "nonpayable",
-        type: "function"
-    }
-] as const;
-
-// -------------------- Kinetic Comptroller ABI --------------------
-export const COMPTROLLER_ABI = [
-    {
-        inputs: [{ name: "kTokens", type: "address[]" }],
-        name: "enterMarkets",
-        outputs: [{ name: "", type: "uint256[]" }],
-        stateMutability: "nonpayable",
-        type: "function"
     },
     {
         inputs: [
-            { name: "account", type: "address" },
-            { name: "kToken", type: "address" }
+            { name: "to", type: "address" },
+            { name: "amount", type: "uint256" }
         ],
-        name: "checkMembership",
-        outputs: [{ name: "", type: "bool" }],
-        stateMutability: "view",
+        name: "mint",
+        outputs: [],
+        stateMutability: "nonpayable",
         type: "function"
     }
 ] as const;

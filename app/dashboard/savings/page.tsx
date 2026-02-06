@@ -10,8 +10,10 @@ import { useAccount, useReadContract } from "wagmi";
 import { CONTRACTS, VAULT_FACTORY_ABI, VAULT_ABI, ERC20_ABI } from "@/lib/contracts";
 import { formatUnits } from "viem";
 import { motion } from "framer-motion";
-import { getReceiptsByWallet, Receipt, getUserVaultsFromDb, saveVault } from "@/lib/receiptService";
+import { getReceiptsByWallet, Receipt, getUserVaultsFromDb, saveVault, getVaultByAddress, SavedVault } from "@/lib/receiptService";
 import { usePublicClient } from "wagmi";
+import { Progress } from "@/components/ui/progress";
+import { useMemo } from "react";
 
 function useCountdown(targetDate: Date) {
     const [timeLeft, setTimeLeft] = useState({
@@ -77,6 +79,7 @@ function VaultCard({ address }: { address: `0x${string}` }) {
     });
 
     const [creationDate, setCreationDate] = useState<Date | null>(null);
+    const [vaultData, setVaultData] = useState<SavedVault | null>(null);
     const { address: userAddress } = useAccount();
 
     const balance = balanceResult ? formatUnits(balanceResult, decimals || 18) : "0";
@@ -108,7 +111,21 @@ function VaultCard({ address }: { address: `0x${string}` }) {
         if (purpose) {
             fetchCreationDate();
         }
-    }, [userAddress, purpose]);
+
+        const fetchVaultData = async () => {
+            const data = await getVaultByAddress(address);
+            setVaultData(data);
+        };
+        fetchVaultData();
+    }, [userAddress, purpose, address]);
+
+    const progressValue = useMemo(() => {
+        if (!vaultData?.targetAmount || !balanceResult || !decimals) return 0;
+        const current = parseFloat(formatUnits(balanceResult as bigint, decimals as number || 18));
+        const target = parseFloat(vaultData.targetAmount);
+        if (target === 0) return 100;
+        return Math.min(100, (current / target) * 100);
+    }, [vaultData, balanceResult, decimals]);
 
     if (parseFloat(balance) <= 0) return null; // Hide empty vaults (broken or withdrawn)
 
@@ -163,6 +180,21 @@ function VaultCard({ address }: { address: `0x${string}` }) {
                             )}
                         </div>
 
+                        {/* Progress Indicator */}
+                        {vaultData?.targetAmount && parseFloat(vaultData.targetAmount) > 0 && (
+                            <div className="space-y-2">
+                                <div className="flex justify-between items-end">
+                                    <span className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Goal Progress</span>
+                                    <span className="text-xs font-bold text-primary">{progressValue.toFixed(0)}%</span>
+                                </div>
+                                <Progress value={progressValue} className="h-1.5 bg-white/5 border border-white/10" />
+                                <div className="flex justify-between text-[10px] text-gray-500">
+                                    <span>${parseFloat(balance).toLocaleString()}</span>
+                                    <span>Target: ${parseFloat(vaultData.targetAmount).toLocaleString()}</span>
+                                </div>
+                            </div>
+                        )}
+
                         <div className="pt-4 border-t border-white/5">
                             <div className="flex justify-between items-end">
                                 <div>
@@ -210,8 +242,10 @@ export default function VaultsPage() {
                         console.warn("Failed to fetch chain vaults", err);
                     }
 
-                    // 3. Merge Unique
-                    const uniqueVaults = Array.from(new Set([...dbVaults, ...chainVaults]));
+                    // 3. Merge Unique (Normalize to lowercase to avoid case-sensitivity duplicates)
+                    const normalizedDb = dbVaults.map(v => v.toLowerCase());
+                    const normalizedChain = chainVaults.map(v => v.toLowerCase());
+                    const uniqueVaults = Array.from(new Set([...normalizedDb, ...normalizedChain]));
                     setVaultAddresses(uniqueVaults);
 
                     // 4. Backfill DB if needed (Background)

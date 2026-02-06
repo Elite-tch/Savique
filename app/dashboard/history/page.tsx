@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Receipt as ReceiptIcon, ExternalLink, CheckCircle, Calendar, Clock, Wallet, Download, FileText, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAccount } from "wagmi";
-import { getReceiptsByWallet, Receipt } from "@/lib/receiptService";
+import { getReceiptsByWallet, Receipt, saveReceipt, getVaultByAddress, SavedVault, updateReceipt, saveVault } from "@/lib/receiptService";
 import { StatementExportModal } from "@/components/StatementExportModal";
 import { jsPDF } from "jspdf";
 import { toast } from "sonner";
@@ -79,7 +79,21 @@ export default function HistoryPage() {
                 y += 7;
                 doc.setFontSize(12);
                 doc.setTextColor(darkColor);
-                doc.text(receipt.type.toUpperCase(), 15, y);
+
+                // Determine descriptive type
+                let typeLabel = "INITIAL DEPOSIT";
+                if (receipt.type === 'completed') typeLabel = "WITHDRAWAL";
+                if (receipt.type === 'breaked') {
+                    typeLabel = "BREAK EARLY";
+                } else if (receipt.type === 'created') {
+                    if (receipt.purpose.toLowerCase().includes('target reached')) {
+                        typeLabel = "GOAL REACHED";
+                    } else if (receipt.purpose.toLowerCase().includes('contributed')) {
+                        typeLabel = "CONTRIBUTION";
+                    }
+                }
+
+                doc.text(typeLabel, 15, y);
                 doc.text(new Date(receipt.timestamp).toLocaleString(), 70, y);
                 doc.text(receipt.verified ? "VERIFIED" : "PENDING", 150, y);
 
@@ -287,13 +301,17 @@ export default function HistoryPage() {
                                                 <h3 className="text-lg font-bold text-white">{receipt.purpose}</h3>
                                                 {/* Tags */}
                                                 {receipt.type === 'breaked' && (
-                                                    <span className="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-red-500/10 text-red-500 border border-red-500/20">Breaked</span>
+                                                    <span className="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-red-500/10 text-red-500 border border-red-500/20">Breaked Early</span>
                                                 )}
                                                 {receipt.type === 'completed' && (
-                                                    <span className="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-green-500/10 text-green-500 border border-green-500/20">Completed</span>
+                                                    <span className="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-green-500/10 text-green-400 border border-green-500/20">Withdrawn</span>
                                                 )}
                                                 {receipt.type === 'created' && (
-                                                    <span className="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-orange-500/10 text-orange-500 border border-blue-500/20">Created</span>
+                                                    <span className="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-orange-500/10 text-orange-500 border border-blue-500/20">
+                                                        {receipt.purpose.toLowerCase().includes('target reached')
+                                                            ? 'Goal Reached'
+                                                            : (receipt.purpose.toLowerCase().includes('contributed') ? 'Contributed' : 'Initial Deposit')}
+                                                    </span>
                                                 )}
                                             </div>
                                             <div className="space-y-1">

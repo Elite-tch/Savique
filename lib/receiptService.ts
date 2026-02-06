@@ -143,25 +143,37 @@ export interface SavedVault {
     factoryAddress: string;
     createdAt: number;
     purpose?: string;
+    targetAmount?: string; // New: Sinking Fund Goal
 }
 
 export async function saveVault(data: SavedVault): Promise<string> {
     try {
-        // Check if exists first to avoid duplicates
+        const normalizedAddress = data.vaultAddress.toLowerCase();
         const vaultsRef = collection(db, VAULTS_COLLECTION);
-        const q = query(vaultsRef, where('vaultAddress', '==', data.vaultAddress));
+        const q = query(vaultsRef, where('vaultAddress', '==', normalizedAddress));
         const snapshot = await getDocs(q);
 
         if (!snapshot.empty) {
-            console.log("Vault already saved:", data.vaultAddress);
-            return snapshot.docs[0].id;
+            const docId = snapshot.docs[0].id;
+            const { updateDoc, doc } = await import('firebase/firestore');
+            const docRef = doc(db, VAULTS_COLLECTION, docId);
+
+            // Update existing vault with new data (like targetAmount)
+            await updateDoc(docRef, {
+                ...data,
+                vaultAddress: normalizedAddress,
+                updatedAt: Timestamp.now()
+            });
+            console.log("Vault updated:", normalizedAddress);
+            return docId;
         }
 
         const docRef = await addDoc(vaultsRef, {
             ...data,
+            vaultAddress: normalizedAddress,
             createdAt: Timestamp.now()
         });
-        console.log('[Firebase] Vault saved:', data.vaultAddress);
+        console.log('[Firebase] Vault saved:', normalizedAddress);
         return docRef.id;
     } catch (error) {
         console.error('Error saving vault:', error);
@@ -212,7 +224,8 @@ export async function getVaultByAddress(vaultAddress: string): Promise<SavedVaul
             owner: data.owner,
             factoryAddress: data.factoryAddress,
             createdAt: createdDay || Date.now(),
-            purpose: data.purpose
+            purpose: data.purpose,
+            targetAmount: data.targetAmount // Retrieve target
         };
     } catch (error) {
         console.error('Error fetching vault by address:', error);
