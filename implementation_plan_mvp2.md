@@ -45,32 +45,32 @@ We need to store the "Target Amount" since it's a UI/Logic metric, not a smart c
 *Enterprise-grade communication for high-net-worth users.*
 
 ### Concept
-Send transactional emails (Deposits, Withdrawals) and timed alearts (Statements, Maturity Warnings) using an email API (e.g., Resend).
+Send transactional emails (Deposits, Withdrawals) and timed alerts (Statements, Maturity Warnings) using **Nodemailer** via SMTP for maximum reliability.
 
 ### Implementation Steps
 
 #### A. Setup Email Service
-*   **Dependency:** Install `resend` (or similar).
-*   **Config:** Add `RESEND_API_KEY` to `.env`.
+*   **Dependency:** Install `nodemailer`.
+*   **Config:** Add SMTP credentials to `.env` (`EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USER`, `EMAIL_PASS`).
 
 #### B. API Route (`app/api/notify/route.ts`)
-Create a secure endpoint to handle email usage.
+Create a secure endpoint using a Nodemailer transport.
 
 ```typescript
 // Payload Structure
 {
   type: 'DEPOSIT_CONFIRMED' | 'MATURITY_WARNING' | 'MONTHLY_STATEMENT',
   userEmail: 'user@example.com',
-  vaultName: 'Corporate Tax Fund',
-  amount: '$5,000',
+  purpose: 'Corporate Tax Fund',
+  amount: '5,000 USDT0',
   txHash: '0x123...'
 }
 ```
 
 #### C. Trigger Points
-*   **On-Demand:** Call this API from the frontend `onSuccess` callback of `deposit()` and `createVault()`.
+*   **On-Demand:** Call this API from the frontend `onSuccess` callback of savings creation or top-ups.
 *   **Automated (Advanced):** set up a GitHub Action or Vercel Cron to run a script daily:
-    1.  Query `activeVaults` from Registry.
+    1.  Query `activeSavings` from Registry.
     2.  Check `unlockTimestamp`.
     3.  If `unlockTimestamp` is in 7 days, trigger `MATURITY_WARNING` email.
 

@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { useProofRails } from "@proofrails/sdk/react";
 import { saveReceipt } from "@/lib/receiptService";
 import { createNotification } from "@/lib/notificationService";
+import { getUserProfile } from "@/lib/userService";
 
 interface VaultBreakModalProps {
     isOpen: boolean;
@@ -107,7 +108,6 @@ export function VaultBreakModal({
                         proofRailsId: receiptResult?.id
                     });
 
-                    // Notify user
                     await createNotification(
                         userAddress!,
                         "Savings Broken & Verified",
@@ -116,6 +116,27 @@ export function VaultBreakModal({
                         '/dashboard/history',
                         receiptResult?.id
                     );
+
+                    // Send Professional Email Notification
+                    try {
+                        const profile = await getUserProfile(userAddress!);
+                        if (profile?.email && profile.notificationPreferences.withdrawals) {
+                            await fetch('/api/notify', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    type: 'SAVINGS_BROKEN',
+                                    userEmail: profile.email,
+                                    purpose: purpose,
+                                    amount: amountToReceive.toFixed(2),
+                                    txHash: receipt.transactionHash,
+                                    proofRailsId: receiptResult?.id
+                                })
+                            });
+                        }
+                    } catch (emailErr) {
+                        console.warn('[Email] Failed to send break notification:', emailErr);
+                    }
 
                     toast.success("Receipt Generated", toastStyle);
                     onClose();
@@ -145,6 +166,26 @@ export function VaultBreakModal({
                         'info',
                         '/dashboard/history'
                     );
+
+                    // Still send email even if ProofRails fails
+                    try {
+                        const profile = await getUserProfile(userAddress!);
+                        if (profile?.email && profile.notificationPreferences.withdrawals) {
+                            await fetch('/api/notify', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    type: 'SAVINGS_BROKEN',
+                                    userEmail: profile.email,
+                                    purpose: purpose,
+                                    amount: amountToReceive.toFixed(2),
+                                    txHash: receipt.transactionHash
+                                })
+                            });
+                        }
+                    } catch (emailErr) {
+                        console.warn('[Email] Failed to send break notification:', emailErr);
+                    }
 
                     onClose();
                     router.push("/dashboard/savings");

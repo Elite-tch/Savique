@@ -21,14 +21,23 @@ export const generateReceiptPDF = async (receipt: Receipt): Promise<Blob> => {
         doc.setFillColor(darkColor);
         doc.rect(5, 5, 200, 40, "F");
 
-        doc.setTextColor(255, 255, 255);
-        doc.setFontSize(24);
-        doc.setFont("helvetica", "bold");
-        doc.text("Savique", 15, 22);
+        // Logo - Using hosted image
+        const logoUrl = 'https://i.ibb.co/YBxF9Lp/logo.png';
+        try {
+            // Add logo image
+            doc.addImage(logoUrl, 'PNG', 15, 12, 40, 20);
+        } catch (err) {
+            // Fallback to text if image fails
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(24);
+            doc.setFont("helvetica", "bold");
+            doc.text("Savique", 15, 22);
+        }
 
+        doc.setTextColor(255, 255, 255);
         doc.setFontSize(10);
         doc.setFont("helvetica", "normal");
-        doc.text("DECENTRALIZED SAVINGS RECEIPT", 15, 32);
+        doc.text("DECENTRALIZED SAVINGS RECEIPT", 15, 38);
 
         doc.setFontSize(12);
         doc.text(`ID: ${receipt.id?.slice(0, 8).toUpperCase() || 'N/A'}`, 160, 22);

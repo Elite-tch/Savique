@@ -15,6 +15,7 @@ import { VaultBreakModal } from "@/components/VaultBreakModal";
 import { useProofRails } from "@proofrails/sdk/react";
 import { saveReceipt, getVaultByAddress, SavedVault, updateReceipt, saveVault, getReceiptsByVault, Receipt } from "@/lib/receiptService";
 import { createNotification } from "@/lib/notificationService";
+import { getUserProfile } from "@/lib/userService";
 import { Progress } from "../../../../components/ui/progress";
 import { Loader2, Plus, ArrowUpCircle } from "lucide-react";
 
@@ -161,9 +162,32 @@ export default function VaultDetailPage() {
                 toastId.current = null;
             }
             toast.error(`Transaction Failed: ${writeError.message.split('\n')[0]}`, toastStyle);
+
+            // Send Failure Email
+            const sendFailureEmail = async () => {
+                try {
+                    const profile = await getUserProfile(userAddress!);
+                    if (profile?.email) {
+                        await fetch('/api/notify', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                type: 'TRANSACTION_FAILED',
+                                userEmail: profile.email,
+                                purpose: purpose as string || "Savings Interaction",
+                                amount: topUpAmount || withdrawingAmount || "0"
+                            })
+                        });
+                    }
+                } catch (e) {
+                    console.warn('[Email] Failed to send failure notification:', e);
+                }
+            };
+            sendFailureEmail();
+
             setTopUpStep('idle');
         }
-    }, [writeError]);
+    }, [writeError, userAddress, purpose, topUpAmount, withdrawingAmount]);
 
     const { isLoading: isConfirming, isSuccess, data: receipt, error: confirmError } = useWaitForTransactionReceipt({ hash });
 
@@ -177,10 +201,34 @@ export default function VaultDetailPage() {
             // Show the actual error to help debugging
             const errMsg = confirmError instanceof Error ? confirmError.message.split('\n')[0] : "Transaction Confirmation Failed";
             toast.error(errMsg, toastStyle);
+
+            // Send Failure Email
+            const sendFailureEmail = async () => {
+                try {
+                    const profile = await getUserProfile(userAddress!);
+                    if (profile?.email) {
+                        await fetch('/api/notify', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                type: 'TRANSACTION_FAILED',
+                                userEmail: profile.email,
+                                purpose: purpose as string || "Savings Interaction",
+                                amount: topUpAmount || withdrawingAmount || "0",
+                                txHash: hash
+                            })
+                        });
+                    }
+                } catch (e) {
+                    console.warn('[Email] Failed to send failure notification:', e);
+                }
+            };
+            sendFailureEmail();
+
             setTopUpStep('idle');
             setIsGeneratingProof(false);
         }
-    }, [confirmError]);
+    }, [confirmError, userAddress, purpose, topUpAmount, withdrawingAmount, hash]);
 
     const balance = balanceResult ? formatUnits(balanceResult as bigint, decimals as number || 18) : "0";
     const unlockDate = unlockTimeResult ? new Date(Number(unlockTimeResult) * 1000) : new Date();
@@ -205,6 +253,30 @@ export default function VaultDetailPage() {
                     toastId.current = null;
                 }
                 toast.error("Transaction Reverted on-chain. Please check your balance and try again.", toastStyle);
+
+                // Send Failure Email
+                const sendFailureEmail = async () => {
+                    try {
+                        const profile = await getUserProfile(userAddress!);
+                        if (profile?.email) {
+                            await fetch('/api/notify', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    type: 'TRANSACTION_FAILED',
+                                    userEmail: profile.email,
+                                    purpose: purpose as string || "Savings Interaction",
+                                    amount: topUpAmount || withdrawingAmount || "0",
+                                    txHash: receipt.transactionHash
+                                })
+                            });
+                        }
+                    } catch (e) {
+                        console.warn('[Email] Failed to send failure notification:', e);
+                    }
+                };
+                sendFailureEmail();
+
                 setTopUpStep('idle');
                 lastProcessedHash.current = receipt.transactionHash; // Mark as seen so we don't repeat the error toast
                 return;
@@ -266,6 +338,43 @@ export default function VaultDetailPage() {
                         receiptResult?.id
                     );
 
+                    // 4. Send Professional Email Notification
+                    try {
+                        const profile = await getUserProfile(userAddress!);
+                        if (profile?.email) {
+                            if (isDeposit && profile.notificationPreferences.deposits) {
+                                await fetch('/api/notify', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        type: 'TOP_UP_CONFIRMED',
+                                        userEmail: profile.email,
+                                        purpose: purpose || "Savings Top Up",
+                                        amount: amountToSave,
+                                        txHash: receipt.transactionHash,
+                                        proofRailsId: receiptResult?.id,
+                                        currentBalance: balance
+                                    })
+                                });
+                            } else if (!isDeposit && profile.notificationPreferences.withdrawals) {
+                                await fetch('/api/notify', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        type: 'WITHDRAWAL_SUCCESS',
+                                        userEmail: profile.email,
+                                        purpose: purpose || "Savings Withdrawal",
+                                        amount: amountToSave,
+                                        txHash: receipt.transactionHash,
+                                        proofRailsId: receiptResult?.id
+                                    })
+                                });
+                            }
+                        }
+                    } catch (emailErr) {
+                        console.warn('[Email] Failed to send notification:', emailErr);
+                    }
+
                     toast.success("Receipt Generated", toastStyle);
 
                     // Refetch all data to update UI immediately
@@ -311,6 +420,41 @@ export default function VaultDetailPage() {
                         'info',
                         isDeposit ? `/dashboard/savings/${address}` : '/dashboard/history'
                     );
+
+                    // Still send email even if ProofRails fails
+                    try {
+                        const profile = await getUserProfile(userAddress!);
+                        if (profile?.email) {
+                            if (isDeposit && profile.notificationPreferences.deposits) {
+                                await fetch('/api/notify', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        type: 'TOP_UP_CONFIRMED',
+                                        userEmail: profile.email,
+                                        purpose: purpose || "Savings Top Up",
+                                        amount: amountToSave,
+                                        txHash: receipt.transactionHash,
+                                        currentBalance: balance
+                                    })
+                                });
+                            } else if (!isDeposit && profile.notificationPreferences.withdrawals) {
+                                await fetch('/api/notify', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        type: 'WITHDRAWAL_SUCCESS',
+                                        userEmail: profile.email,
+                                        purpose: purpose || "Savings Withdrawal",
+                                        amount: amountToSave,
+                                        txHash: receipt.transactionHash
+                                    })
+                                });
+                            }
+                        }
+                    } catch (emailErr) {
+                        console.warn('[Email] Failed to send fallback notification:', emailErr);
+                    }
 
                     // Refetch data even on error fallback
                     refetchBalance();

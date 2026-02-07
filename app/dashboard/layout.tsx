@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { Shield, LayoutDashboard, PlusCircle, History, LogOut, Wallet, User, Lock, Menu, X, BarChart3, Lightbulb } from "lucide-react";
+import { Shield, LayoutDashboard, PlusCircle, History, LogOut, Wallet, User, Lock, Menu, X, BarChart3, Lightbulb, Settings } from "lucide-react";
 import { useDisconnect, useAccount } from "wagmi";
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 
@@ -176,6 +176,13 @@ function SidebarContent({ pathname, onNavigate }: { pathname: string; onNavigate
                         icon={<Lightbulb className="w-5 h-5" />}
                         label="Savings Tips"
                         active={pathname.startsWith("/dashboard/tips")}
+                        onClick={onNavigate}
+                    />
+                    <NavItem
+                        href="/dashboard/settings"
+                        icon={<Settings className="w-5 h-5" />}
+                        label="Settings"
+                        active={pathname.startsWith("/dashboard/settings")}
                         onClick={onNavigate}
                     />
                 </div>

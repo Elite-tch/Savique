@@ -14,6 +14,7 @@ import { parseUnits, formatUnits, decodeEventLog } from "viem";
 import { useProofRails } from "@proofrails/sdk/react";
 import { saveReceipt, saveVault } from "@/lib/receiptService";
 import { createNotification } from "@/lib/notificationService";
+import { getUserProfile } from "@/lib/userService";
 
 const MAX_UINT256 = BigInt("115792089237316195423570985008687907853269984665640564039457584007913129639935");
 
@@ -167,10 +168,33 @@ export default function CreatePersonalVault() {
             console.error("Write error:", writeError);
             if (toastId.current) toast.dismiss(toastId.current);
             toast.error(`Transaction Failed: ${writeError.message.split('\n')[0]}`, toastStyle);
+
+            // Send Failure Email
+            const sendFailureEmail = async () => {
+                try {
+                    const profile = await getUserProfile(address!);
+                    if (profile?.email) {
+                        await fetch('/api/notify', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                type: 'TRANSACTION_FAILED',
+                                userEmail: profile.email,
+                                purpose: formData.purpose || "New Savings Creation",
+                                amount: formData.amount || "0"
+                            })
+                        });
+                    }
+                } catch (e) {
+                    console.warn('[Email] Failed to send failure notification:', e);
+                }
+            };
+            sendFailureEmail();
+
             setTxHash(undefined);
             setCurrentStep('idle');
         }
-    }, [writeError]);
+    }, [writeError, address, formData.purpose, formData.amount]);
 
     // Handle Network/On-chain Revert Errors
     useEffect(() => {
@@ -183,10 +207,34 @@ export default function CreatePersonalVault() {
                 : "Transaction Reverted on-chain";
 
             toast.error(`Confirmation Failed: ${errMsg}`, toastStyle);
+
+            // Send Failure Email
+            const sendFailureEmail = async () => {
+                try {
+                    const profile = await getUserProfile(address!);
+                    if (profile?.email) {
+                        await fetch('/api/notify', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                type: 'TRANSACTION_FAILED',
+                                userEmail: profile.email,
+                                purpose: formData.purpose || "New Savings Creation",
+                                amount: formData.amount || "0",
+                                txHash: receipt?.transactionHash
+                            })
+                        });
+                    }
+                } catch (e) {
+                    console.warn('[Email] Failed to send failure notification:', e);
+                }
+            };
+            sendFailureEmail();
+
             setTxHash(undefined);
             setCurrentStep('idle');
         }
-    }, [isConfirmError, confirmError, isSuccess, receipt]);
+    }, [isConfirmError, confirmError, isSuccess, receipt, address, formData.purpose, formData.amount]);
 
     const triggerCreateVault = () => {
         const val = customDuration ? parseInt(customDuration) : parseInt(formData.duration);
@@ -292,6 +340,36 @@ export default function CreatePersonalVault() {
                 receiptResult.id
             );
 
+            // Send Professional Email Notification
+            try {
+                console.log('[Email] Checking user profile for email notifications...');
+                const profile = await getUserProfile(address!);
+                console.log('[Email] Profile loaded:', profile);
+
+                if (profile?.email && profile.notificationPreferences.deposits) {
+                    console.log('[Email] Sending notification to:', profile.email);
+                    const response = await fetch('/api/notify', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            type: 'DEPOSIT_CONFIRMED',
+                            userEmail: profile.email,
+                            purpose: formData.purpose,
+                            amount: formData.amount,
+                            txHash: txHashStr,
+                            proofRailsId: receiptResult.id,
+                            targetAmount: formData.targetAmount || formData.amount
+                        })
+                    });
+                    const result = await response.json();
+                    console.log('[Email] API Response:', result);
+                } else {
+                    console.log('[Email] Skipping - No email or deposits disabled');
+                }
+            } catch (emailErr) {
+                console.error('[Email] Failed to trigger notification:', emailErr);
+            }
+
             // Save receipt to Firestore
             await saveReceipt({
                 walletAddress: address!.toLowerCase(),
@@ -331,6 +409,27 @@ export default function CreatePersonalVault() {
                 'info',
                 `/dashboard/savings/${targetVault}`
             );
+
+            // Still send email even if ProofRails fails
+            try {
+                const profile = await getUserProfile(address!);
+                if (profile?.email && profile.notificationPreferences.deposits) {
+                    await fetch('/api/notify', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            type: 'DEPOSIT_CONFIRMED',
+                            userEmail: profile.email,
+                            purpose: formData.purpose,
+                            amount: formData.amount,
+                            txHash: txHashStr,
+                            targetAmount: formData.targetAmount || formData.amount
+                        })
+                    });
+                }
+            } catch (emailErr) {
+                console.warn('[Email] Failed to send fallback notification:', emailErr);
+            }
 
             toast.error("Receipt Gen Failed but Savings Created", toastStyle);
             setCurrentStep('done');
