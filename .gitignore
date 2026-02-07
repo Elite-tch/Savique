@@ -39,6 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-SUBMISSION.md
-implementation_plan_mvp2.md
-implementation_plan_mvp3.md
+# markdown
+*.md
+!README.md
