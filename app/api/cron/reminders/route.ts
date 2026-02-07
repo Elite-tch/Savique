@@ -5,8 +5,8 @@ import { sendNotificationEmail, EmailType } from '@/lib/emailService';
 import { getUserProfile } from '@/lib/userService';
 import { createPublicClient, http } from 'viem';
 import { flareTestnet } from 'viem/chains';
-import { VAULT_ABI } from '@/contracts/abis';
-import { FACTORY_ADDRESS, FACTORY_ABI } from '@/contracts/factory';
+import { VAULT_ABI, VAULT_FACTORY_ABI, CONTRACTS } from '@/lib/contracts';
+import { getUserVaultsFromDb } from '@/lib/receiptService';
 
 // Secret key to protect the cron endpoint (set in Vercel env vars)
 const CRON_SECRET = process.env.CRON_SECRET;
@@ -71,12 +71,18 @@ export async function GET(req: NextRequest) {
                 // Get user's vaults from factory contract
                 let vaults: readonly `0x${string}`[] = [];
                 try {
-                    vaults = await publicClient.readContract({
-                        address: FACTORY_ADDRESS as `0x${string}`,
-                        abi: FACTORY_ABI,
-                        functionName: 'getVaultsByOwner',
-                        args: [walletAddress as `0x${string}`]
-                    }) as readonly `0x${string}`[];
+                    // Try to get from DB first as it's faster
+                    vaults = await getUserVaultsFromDb(walletAddress) as `0x${string}`[];
+
+                    // Fallback to contract if DB is empty (rare but possible)
+                    if (!vaults || vaults.length === 0) {
+                        vaults = await publicClient.readContract({
+                            address: CONTRACTS.coston2.VaultFactory,
+                            abi: VAULT_FACTORY_ABI,
+                            functionName: 'getUserVaults',
+                            args: [walletAddress as `0x${string}`]
+                        }) as readonly `0x${string}`[];
+                    }
                 } catch (e) {
                     console.warn(`[CronReminders] Failed to get vaults for ${walletAddress.slice(0, 10)}:`, e);
                     continue;
@@ -101,7 +107,7 @@ export async function GET(req: NextRequest) {
                             publicClient.readContract({
                                 address: vaultAddress,
                                 abi: VAULT_ABI,
-                                functionName: 'totalDeposits'
+                                functionName: 'totalAssets'
                             }),
                             publicClient.readContract({
                                 address: vaultAddress,

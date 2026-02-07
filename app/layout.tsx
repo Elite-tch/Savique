@@ -7,12 +7,12 @@ const outfit = Outfit({ subsets: ["latin"], variable: '--font-outfit' });
 const jakarta = Plus_Jakarta_Sans({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://safevault-app.vercel.app"),
+  metadataBase: new URL("https://savique-fb5p.vercel.app"),
   title: {
-    default: "Savique | Secure Crypto Savings on Flare",
+    default: "Savique | Secure Digital Savings & Disciplined Goals",
     template: "%s | Savique"
   },
-  description: "Savique is the smart commitment protocol for your capital. Create purpose-driven, time-locked Savings on the Flare Network. Build financial discipline, earn verifiable proofs, and secure your future.",
+  description: "Savique is the smart savings protocol for your capital. Create purpose-driven, time-locked savings goals. Build financial discipline, earn verifiable success certificates, and secure your financial future through automated digital vaults.",
   applicationName: "Savique",
   authors: [{ name: "Savique Team", url: "https://savique.finance" }],
   creator: "Savique Team",
@@ -24,39 +24,39 @@ export const metadata: Metadata = {
   },
   keywords: [
     "Savique",
-    "Flare Network",
-    "Crypto Savings",
+    "Digital Savings",
     "Time-Locked Savings",
-    "DeFi",
-    "ProofRails",
-    "Web3 Savings",
-    "Coston2",
+    "Savings Goals",
     "Financial Discipline",
-    "Smart Vaults",
-    "Crypto Banking"
+    "Smart Vault technology",
+    "Digital asset management",
+    "Automated Savings",
+    "Wealth building",
+    "Secure Digital Assets",
+    "Financial Commitment"
   ],
   openGraph: {
-    title: "Savique | Secure Crypto Savings on Flare",
-    description: "Automated, purpose-driven savings secured by smart contracts on the Flare Network. Build discipline and verifiable financial reputation.",
-    url: "https://safevault-app.vercel.app",
+    title: "Savique | Secure Digital Savings & Goals",
+    description: "Automated, purpose-driven savings secured by smart protocol technology. Build discipline and a verifiable financial reputation.",
+    url: "https://savique-fb5p.vercel.app",
     siteName: "Savique",
     locale: "en_US",
     type: "website",
     images: [
       {
-        url: "/logo3.png", // Ensure this exists or use a generic one
+        url: "https://res.cloudinary.com/dibwnfwk9/image/upload/v1770464073/ChatGPT_Image_Feb_6__2026__07_08_19_AM-removebg-preview_tvlkzh.png",
         width: 1200,
         height: 630,
-        alt: "Savique - Smart Commitment Protocol",
+        alt: "Savique - Smart Savings Protocol",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Savique | Secure Crypto Savings on Flare",
+    title: "Savique | Secure Digital Savings & Goals",
     description: "Secure your financial future with Savique. Smart Savings for disciplined wealth building.",
-    creator: "@SaviqueApp", // Placeholder handle
-    images: ["/og-image.png"],
+    creator: "@SaviqueApp",
+    images: ["https://res.cloudinary.com/dibwnfwk9/image/upload/v1770464073/ChatGPT_Image_Feb_6__2026__07_08_19_AM-removebg-preview_tvlkzh.png"],
   },
   robots: {
     index: true,
@@ -71,14 +71,14 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: "/favicon.ico",
-    apple: "/favicon.ico", // Recommended to add
+    apple: "/favicon.ico",
   },
   verification: {
     google: "9kwTXYiVS0JqYGiaeAurG8sAycV-s15TzQ6KOsFa4TA",
   },
   category: "Finance",
   alternates: {
-    canonical: "https://safevault-app.vercel.app",
+    canonical: "https://savique-fb5p.vercel.app",
   },
 };
 
