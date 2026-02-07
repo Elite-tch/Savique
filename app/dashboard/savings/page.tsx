@@ -423,12 +423,12 @@ function SavingsDashboard() {
             </div>
 
             {/* Tabs - Responsive with scrolling */}
-            <div className="flex items-center gap-1 bg-white/5 p-1 rounded-xl w-full md:w-fit border border-white/10 overflow-x-auto no-scrollbar flex-nowrap">
+            <div className="flex items-center gap-1 bg-white/5 p-1 rounded-xl w-full md:w-fit border border-white/10 overflow-x-scroll no-scrollbar  ">
                 {(['active', 'matured', 'completed'] as TabType[]).map((tab) => (
                     <button
                         key={tab}
                         onClick={() => handleTabChange(tab)}
-                        className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center gap-2 shrink-0 ${activeTab === tab
+                        className={`md:px-6 px-3 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center gap-2 shrink-0 ${activeTab === tab
                             ? 'bg-primary text-white shadow-lg'
                             : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5'
                             }`}

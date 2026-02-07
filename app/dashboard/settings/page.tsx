@@ -207,18 +207,20 @@ export default function SettingsPage() {
 
 function PreferenceToggle({ label, description, enabled, onChange }: { label: string, description: string, enabled: boolean, onChange: (v: boolean) => void }) {
     return (
-        <div className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5 hover:border-white/10 transition-all">
+        <div className="flex md:items-center gap-3 md:justify-between md:flex-row flex-col p-4 rounded-xl bg-white/5 border border-white/5 hover:border-white/10 transition-all">
             <div className="space-y-0.5">
                 <p className="text-sm font-bold text-white">{label}</p>
                 <p className="text-xs text-zinc-500">{description}</p>
             </div>
-            <button
+            <div className="flex justify-end">
+                <button
                 type="button"
                 onClick={() => onChange(!enabled)}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${enabled ? 'bg-primary' : 'bg-zinc-700'}`}
             >
                 <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${enabled ? 'translate-x-6' : 'translate-x-1'}`} />
             </button>
+            </div>
         </div>
     );
 }
