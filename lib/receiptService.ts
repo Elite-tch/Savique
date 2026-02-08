@@ -173,6 +173,7 @@ export interface SavedVault {
     createdAt: number;
     purpose?: string;
     targetAmount?: string; // New: Sinking Fund Goal
+    beneficiary?: string; // Emergency Beneficiary
 }
 
 export async function saveVault(data: SavedVault): Promise<string> {

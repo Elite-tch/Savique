@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Rocket, AlertTriangle, Coins, Lock, Calendar, TrendingUp, Info, Plus, Wallet, Receipt, Loader2, Check } from "lucide-react";
+import { ArrowLeft, Rocket, AlertTriangle,ShieldCheck, Coins, Lock, Calendar, TrendingUp, Info, Plus, Wallet, Receipt, Loader2, Check } from "lucide-react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -54,7 +54,8 @@ export default function CreatePersonalVault() {
         amount: "",
         targetAmount: "", // New: Sinking Fund Goal
         duration: "30",
-        durationUnit: "days" as "minutes" | "hours" | "days"
+        durationUnit: "days" as "minutes" | "hours" | "days",
+        beneficiary: ""
     });
 
     const [customDuration, setCustomDuration] = useState("");
@@ -253,7 +254,13 @@ export default function CreatePersonalVault() {
             address: CONTRACTS.coston2.VaultFactory,
             abi: VAULT_FACTORY_ABI,
             functionName: "createPersonalVault",
-            args: [formData.purpose, BigInt(unlockTimestamp), BigInt(penaltyBps), amountUnits]
+            args: [
+                formData.purpose,
+                BigInt(unlockTimestamp),
+                BigInt(penaltyBps),
+                amountUnits,
+                (formData.beneficiary || "0x0000000000000000000000000000000000000000") as `0x${string}`
+            ]
         }, {
             onSuccess: (hash) => setTxHash(hash)
         });
@@ -306,7 +313,8 @@ export default function CreatePersonalVault() {
                 factoryAddress: CONTRACTS.coston2.VaultFactory,
                 createdAt: Date.now(),
                 purpose: formData.purpose,
-                targetAmount: formData.targetAmount || formData.amount // Fallback to initial amount if not set
+                targetAmount: formData.targetAmount || formData.amount, // Fallback to initial amount if not set
+                beneficiary: formData.beneficiary || ""
             });
             console.log("✅ Savings saved to registry");
 
@@ -513,6 +521,26 @@ export default function CreatePersonalVault() {
                                     value={formData.purpose}
                                     onChange={(e) => setFormData({ ...formData, purpose: e.target.value })}
                                 />
+                            </div>
+
+                            {/* Emergency Beneficiary */}
+                            <div className="space-y-2">
+                                <label className="text-sm font-semibold text-white flex items-center gap-2">
+                                    <ShieldCheck className="w-4 h-4 text-primary" />
+                                    Emergency Beneficiary (Optional)
+                                </label>
+                                <input
+                                    type="text"
+                                    placeholder="Enter wallet address (0x...)"
+                                    disabled={isProcessing}
+                                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-white focus:border-primary/50 focus:outline-none font-mono text-sm"
+                                    value={formData.beneficiary}
+                                    onChange={(e) => setFormData({ ...formData, beneficiary: e.target.value })}
+                                />
+                                <p className="text-[10px] text-gray-500 italic">
+                                    If you remain inactive for 1 year after the lock ends, this wallet can claim the funds.
+                                    Everything remains private until then.
+                                </p>
                             </div>
 
                             {/* Amount */}

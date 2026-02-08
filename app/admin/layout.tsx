@@ -143,6 +143,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                             active={pathname === '/admin/completed'}
                             onClick={() => setSidebarOpen(false)}
                         />
+                        <SidebarLink
+                            href="/admin/beneficiary-releases"
+                            icon={<Shield size={20} />}
+                            label="Beneficiary Releases"
+                            active={pathname === '/admin/beneficiary-releases'}
+                            onClick={() => setSidebarOpen(false)}
+                        />
                     </nav>
                 </div>
 

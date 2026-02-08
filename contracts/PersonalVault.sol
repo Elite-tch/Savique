@@ -16,9 +16,13 @@ contract PersonalVault is AbstractVault {
     uint256 public unlockTimestamp;
     uint256 public penaltyBps; // Basis points (e.g. 500 = 5%)
     address public treasury; // Address to receive penalties
+    address public beneficiary; // Emergency beneficiary
+    address public factory; // Factory that deployed this vault
+    uint256 public constant GRACE_PERIOD = 5 minutes; // TESTING (Production: 365 days)
 
     event EarlyWithdrawal(address indexed user, uint256 amountWithdraw, uint256 penaltyPaid);
     event FullWithdrawal(address indexed user, uint256 amount);
+    event BeneficiaryClaimed(address indexed beneficiary, uint256 amount);
 
     constructor(
         address _token,
@@ -26,7 +30,8 @@ contract PersonalVault is AbstractVault {
         address _owner,
         uint256 _unlockTimestamp,
         uint256 _penaltyBps,
-        address _treasury
+        address _treasury,
+        address _beneficiary
     ) AbstractVault(_purpose, _owner) {
         require(_token != address(0), "Invalid token address");
         require(_unlockTimestamp > block.timestamp, "Unlock time must be in future");
@@ -36,6 +41,8 @@ contract PersonalVault is AbstractVault {
         unlockTimestamp = _unlockTimestamp;
         penaltyBps = _penaltyBps;
         treasury = _treasury;
+        beneficiary = _beneficiary;
+        factory = msg.sender;
     }
 
     /**
@@ -87,5 +94,20 @@ contract PersonalVault is AbstractVault {
      */
     function totalAssets() public view override returns (uint256) {
         return token.balanceOf(address(this));
+    }
+
+    /**
+     * @dev Allows factory admin to trigger beneficiary claim after grace period
+     */
+    function claimByBeneficiary() external nonReentrant {
+        require(msg.sender == factory, "Only factory admin");
+        require(beneficiary != address(0), "No beneficiary set");
+        require(block.timestamp > unlockTimestamp + GRACE_PERIOD, "Grace period not over");
+        
+        uint256 balance = token.balanceOf(address(this));
+        require(balance > 0, "No funds to claim");
+
+        token.safeTransfer(beneficiary, balance);
+        emit BeneficiaryClaimed(beneficiary, balance);
     }
 }

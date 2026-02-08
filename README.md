@@ -1,55 +1,71 @@
-# Professional Savings Commitment Protocol
+# Savique: Professional Savings Commitment Protocol
 
-A disciplined, on-chain savings platform designed to foster financial growth through cryptographic commitments and verifiable audit trails.
+Savique is a premium, disciplined, on-chain savings platform designed for high-conviction wealth building. It bridges the gap between decentralized assets and real-world financial maturity through cryptographic commitments and verifiable audit trails.
 
 ---
 
 ## 🛑 The Problem
 
-Modern digital wealth is highly liquid, which often leads to **financial indiscretion**. Traditional savings accounts and wallets make it too easy to "dip into" funds meant for long-term goals or essential IRL (In Real Life) expenses like rent, taxes, or business capital.
+Modern digital wealth is engineered for high liquidity, which often leads to **financial indiscretion**. Traditional wallets make it too easy to "dip into" funds meant for long-term goals or essential expenses like rent, taxes, or business capital.
 
-Furthermore, when users need to prove their financial stability to third parties (landlords, auditors, or banks), they often lack a **verifiable, tamper-proof audit trail** that proves they have the discipline to hold and commit capital over time.
+Furthermore, when users need to prove their financial stability to third parties (landlords, auditors, or banks), they lack a **verifiable, tamper-proof audit trail** that proves they have the discipline to hold and commit capital over time.
 
 ---
 
 ## ✅ The Solution
 
-This platform provides a **Strategic Commitment Layer** for your capital. By moving beyond simple "storage," it introduces:
+Savique provides a **Strategic Commitment Layer** for your capital. By moving beyond simple "storage," it introduces:
 
-1.  **Enforced Discipline**: Funds are cryptographically sealed for a user-defined period. This removes the temptation of impulsive spending and ensures that savings goals are met.
-2.  **Verified Audit Trails**: Every financial action—from the initial deposit to the final maturity—produces a cryptographically signed receipt via the **ProofRails SDK**. This creates an immutable history of your financial commitment.
-3.  **Real-World Utility**: Users can generate professional, verifiable reports that prove their savings history and current locked-in reserves. This bridges the gap between on-chain assets and real-world financial requirements.
-
----
-
-## ✨ Key Features
-
-### 1. Savings Commitments
-Users can initiate fixed-term savings plans. Once funds are committed, they are sealed on-chain until the maturity date. This creates a psychological and cryptographic barrier against unnecessary spending.
-
-### 2. Strategic Recalls (Early Liquidations)
-While the protocol encourages discipline, it allows for flexibility in emergencies. Users can recall their capital before the maturity date, subject to a calculated "Indiscretion Fee," which is then displayed in their financial analysis to encourage better future habits.
-
-### 3. Financial Intelligence Dashboard
-A visual center for tracking wealth trajectories.
-*   **Balance Growth**: Visualizes how committed capital scales over time.
-*   **Audit Distribution**: Provides a categorized view of all financial proofs and receipts.
-
-### 4. Professional Proof Exports
-The platform bridges the gap to IRL payments by allowing users to export their financial history into **Official Statements**. These documents include verification hooks (QR links to on-chain explorers) so third parties can trust the data without needing to be crypto-experts.
+1.  **Enforced Discipline**: Funds are cryptographically sealed for a user-defined period, removing the temptation of impulsive spending.
+2.  **Verified Audit Trails**: Every financial action produces a cryptographically signed receipt via **ProofRails**, creating an immutable history of your financial commitment.
+3.  **Real-World Utility**: Bridge the gap to IRL financial requirements with professional, verifiable reports and digital inheritance.
 
 ---
 
-## � Technical Implementation
+## ✨ Premium Features (V2)
 
-*   **ProofRails Integration**: Utilized to sign and verify every critical transaction, ensuring that the user's "Audit Trail" is cryptographically sound.
-*   **Non-Custodial Architecture**: Users maintain full control over their funds; the protocol merely provides the discipline-enforcement layer.
-*   **Professional Reporting**: Integrated PDF/CSV generation logic to transform raw blockchain data into readable financial documents.
+### 1. Sinking Fund Protocol (Goal Tracking)
+Users can now set specific financial targets (e.g., "Property Deposit," "Emergency Fund"). The protocol tracks your progress in real-time, visualizing how close you are to your absolute financial freedom.
+
+### 2. Flexible Top-Ups
+Unlike static savings contracts, Savique allows you to "fuel" your goals. You can add funds to any active savings plan at any time, compounding your commitment without extending the lock-up period.
+
+### 3. Emergency Beneficiary Protocol (Inheritance)
+The ultimate peace of mind. Users can designate an emergency beneficiary address. If the owner becomes inactive after the lock period ends, the protocol allows for an admin-authorized release to the beneficiary, ensuring wealth is never lost to the void.
+
+### 4. Professional Notification System
+Stay connected to your wealth. Savique integrates an automated notification system that sends:
+*   **Transaction Confirmations**: Instant receipts via email.
+*   **Maturity Alerts**: Notifications when your capital is ready for deployment.
+*   **Security Warnings**: Alerts for any unauthorized early withdrawal attempts.
+
+### 5. Financial Intelligence & TVL Dashboard
+A visual command center for tracking Total Value Locked (TVL) and wealth trajectories.
+*   **Proof of Reserves**: Real-time transparency of all capital secured by the protocol.
+*   **Audit Distribution**: Categorized view of all financial proofs and receipts.
+
+---
+
+## 🏗️ Technical Stack
+
+*   **Network**: Flare Coston2 (Low-latency, high-security L1).
+*   **Verification**: ProofRails SDK for cryptographically signed financial statements.
+*   **Persistence**: Firebase for user profiles and professional notification routing.
+*   **Standard**: OpenZeppelin-standard smart contracts for non-custodial security.
 
 ---
 
 ## ⚙️ Getting Started
 
 1.  **Install Dependencies**: `npm install`
-2.  **Configure API**: Set up your `NEXT_PUBLIC_PROOFRAILS_KEY` in your environment.
+2.  **Environment Setup**:
+    *   `NEXT_PUBLIC_PROOFRAILS_KEY`: For audit signatures.
+    *   `FIREBASE_CONFIG`: For persistence and profiles.
+    *   `RESEND_API_KEY`: For professional email notifications.
 3.  **Launch**: `npm run dev`
+
+---
+
+## 🌐 On-Chain Verification
+The `VaultFactory` is currently deployed and verified on **Flare Coston2**:
+`0x4E70a85B1553ef34128C13C52B81A5862e4A11Dc`

@@ -1,7 +1,7 @@
 // -------------------- Config --------------------
 export const CONTRACTS = {
     coston2: {
-        VaultFactory: "0x71185A25db74E47F3a1e13b5ab112D3834B58e66" as `0x${string}`,
+        VaultFactory: "0x4E70a85B1553ef34128C13C52B81A5862e4A11Dc" as `0x${string}`,
         USDTToken: "0xC1A5B41512496B80903D1f32d6dEa3a73212E71F" as `0x${string}`,
     },
 } as const;
@@ -12,7 +12,8 @@ export const VAULT_FACTORY_ABI = [
             { name: "_purpose", type: "string" },
             { name: "_unlockTimestamp", type: "uint256" },
             { name: "_penaltyBps", type: "uint256" },
-            { name: "_initialDeposit", type: "uint256" }
+            { name: "_initialDeposit", type: "uint256" },
+            { name: "_beneficiary", type: "address" }
         ],
         name: "createPersonalVault",
         outputs: [{ name: "", type: "address" }],
@@ -31,6 +32,27 @@ export const VAULT_FACTORY_ABI = [
         name: "getUserVaults",
         outputs: [{ name: "", type: "address[]" }],
         stateMutability: "view",
+        type: "function"
+    },
+    {
+        inputs: [],
+        name: "getAllVaults",
+        outputs: [{ name: "", type: "address[]" }],
+        stateMutability: "view",
+        type: "function"
+    },
+    {
+        inputs: [],
+        name: "owner",
+        outputs: [{ name: "", type: "address" }],
+        stateMutability: "view",
+        type: "function"
+    },
+    {
+        inputs: [{ name: "_vault", type: "address" }],
+        name: "triggerBeneficiaryClaim",
+        outputs: [],
+        stateMutability: "nonpayable",
         type: "function"
     }
 ] as const;
@@ -74,6 +96,27 @@ export const VAULT_ABI = [
     {
         inputs: [],
         name: "withdraw",
+        outputs: [],
+        stateMutability: "nonpayable",
+        type: "function"
+    },
+    {
+        inputs: [],
+        name: "beneficiary",
+        outputs: [{ name: "", type: "address" }],
+        stateMutability: "view",
+        type: "function"
+    },
+    {
+        inputs: [],
+        name: "GRACE_PERIOD",
+        outputs: [{ name: "", type: "uint256" }],
+        stateMutability: "view",
+        type: "function"
+    },
+    {
+        inputs: [],
+        name: "claimByBeneficiary",
         outputs: [],
         stateMutability: "nonpayable",
         type: "function"

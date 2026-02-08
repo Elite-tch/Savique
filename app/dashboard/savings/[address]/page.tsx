@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { useReadContract, useWriteContract, useWaitForTransactionReceipt, useAccount } from "wagmi";
-import { VAULT_ABI, ERC20_ABI, CONTRACTS } from "@/lib/contracts";
+import { VAULT_ABI, VAULT_FACTORY_ABI, ERC20_ABI, CONTRACTS } from "@/lib/contracts";
 import { formatUnits, parseUnits } from "viem";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -110,6 +110,14 @@ export default function VaultDetailPage() {
         address: CONTRACTS.coston2.USDTToken,
         abi: ERC20_ABI,
         functionName: 'decimals',
+    });
+
+    const { data: beneficiary } = useReadContract({ address, abi: VAULT_ABI, functionName: "beneficiary" });
+    const { data: gracePeriod } = useReadContract({ address, abi: VAULT_ABI, functionName: "GRACE_PERIOD" });
+    const { data: factoryOwner } = useReadContract({
+        address: CONTRACTS.coston2.VaultFactory,
+        abi: VAULT_FACTORY_ABI,
+        functionName: "owner"
     });
 
     // Check Allowance for Top-up
@@ -234,6 +242,16 @@ export default function VaultDetailPage() {
     const unlockDate = unlockTimeResult ? new Date(Number(unlockTimeResult) * 1000) : new Date();
     const isLocked = new Date() < unlockDate;
     const countdown = useCountdown(unlockDate);
+
+    const isOwner = userAddress?.toLowerCase() === vaultData?.owner?.toLowerCase();
+    const isFactoryAdmin = userAddress?.toLowerCase() === (factoryOwner as string)?.toLowerCase();
+
+    const canTriggerBeneficiaryRelease = isFactoryAdmin &&
+        !isLocked &&
+        unlockTimeResult &&
+        gracePeriod &&
+        (Date.now() / 1000 > Number(unlockTimeResult) + Number(gracePeriod)) &&
+        parseFloat(balance) > 0;
 
     useEffect(() => {
         // Set random quote on mount
@@ -493,6 +511,22 @@ export default function VaultDetailPage() {
         }
     };
 
+    const handleAuthorizeRelease = () => {
+        try {
+            setWithdrawingAmount(balance);
+            toastId.current = toast.loading("Authorizing Release to Beneficiary...", toastStyle);
+            writeContract({
+                address: CONTRACTS.coston2.VaultFactory,
+                abi: VAULT_FACTORY_ABI,
+                functionName: "triggerBeneficiaryClaim",
+                args: [address]
+            });
+        } catch (error) {
+            console.error(error);
+            if (toastId.current) toast.dismiss(toastId.current);
+        }
+    };
+
     const handleTopUp = async (bypassAllowance = false) => {
         if (!userAddress || !topUpAmount) return;
 
@@ -714,6 +748,22 @@ export default function VaultDetailPage() {
                         </p>
                     </Card>
 
+                    {/* Beneficiary Info */}
+                    {beneficiary && beneficiary !== '0x0000000000000000000000000000000000000000' && (
+                        <Card className="p-4 bg-zinc-900 border-zinc-800">
+                            <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold mb-2">Emergency Beneficiary</p>
+                            <div className="flex items-center gap-2 text-xs text-white font-mono bg-black/30 p-2 rounded border border-white/5">
+                                <ShieldCheck className="w-3 h-3 text-primary" />
+                                {(beneficiary as string).slice(0, 6)}...{(beneficiary as string).slice(-4)}
+                            </div>
+                            {isFactoryAdmin && (
+                                <p className="text-[10px] text-zinc-500 mt-2 italic">
+                                    As Admin, you can authorize the release of these funds 5 minutes after maturity.
+                                </p>
+                            )}
+                        </Card>
+                    )}
+
                     {/* Actions */}
                     <div className="space-y-3 pt-2">
                         {parseFloat(balance) <= 0 ? (
@@ -788,14 +838,35 @@ export default function VaultDetailPage() {
                                 </Button>
                             </>
                         ) : (
-                            <Button
-                                size="lg"
-                                className="w-full bg-[#E62058] hover:bg-[#E62058]/90 text-white shadow-lg shadow-primary/20"
-                                onClick={handleWithdrawUnlocked}
-                                disabled={isWithdrawPending || isConfirming}
-                            >
-                                {isWithdrawPending || isConfirming ? "Processing..." : "Withdraw Funds"}
-                            </Button>
+                            <div className="space-y-3">
+                                {isOwner && (
+                                    <Button
+                                        size="lg"
+                                        className="w-full bg-[#E62058] hover:bg-[#E62058]/90 text-white shadow-lg shadow-primary/20"
+                                        onClick={handleWithdrawUnlocked}
+                                        disabled={isWithdrawPending || isConfirming}
+                                    >
+                                        {isWithdrawPending || isConfirming ? "Processing..." : "Withdraw Funds"}
+                                    </Button>
+                                )}
+
+                                {canTriggerBeneficiaryRelease && (
+                                    <Button
+                                        size="lg"
+                                        className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/20"
+                                        onClick={handleAuthorizeRelease}
+                                        disabled={isWithdrawPending || isConfirming}
+                                    >
+                                        {isWithdrawPending || isConfirming ? "Processing..." : "Authorize Release to Beneficiary"}
+                                    </Button>
+                                )}
+
+                                {!isOwner && !canTriggerBeneficiaryRelease && (
+                                    <Button disabled className="w-full bg-zinc-800/50 text-zinc-500 border border-zinc-700/30 cursor-not-allowed">
+                                        Vault Matured
+                                    </Button>
+                                )}
+                            </div>
                         )}
                     </div>
                 </div>
@@ -810,4 +881,4 @@ export default function VaultDetailPage() {
             />
         </div>
     );
-}
+} 

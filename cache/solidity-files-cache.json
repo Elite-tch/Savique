@@ -151,8 +151,8 @@
       ]
     },
     "C:\\Users\\pc\\Documents\\MY-PROJECTS\\safevault\\contracts\\PersonalVault.sol": {
-      "lastModificationDate": 1769954673955,
-      "contentHash": "51991dc070549a7da37c1f075c3b21b1",
+      "lastModificationDate": 1770558081435,
+      "contentHash": "de1d1f940d3f0323092e359fb1ab28d1",
       "sourceName": "contracts/PersonalVault.sol",
       "solcConfig": {
         "version": "0.8.20",
@@ -187,7 +187,6 @@
         "^0.8.20"
       ],
       "artifacts": [
-        "IKToken",
         "PersonalVault"
       ]
     },
@@ -414,8 +413,8 @@
       ]
     },
     "C:\\Users\\pc\\Documents\\MY-PROJECTS\\safevault\\contracts\\VaultFactory.sol": {
-      "lastModificationDate": 1769954690874,
-      "contentHash": "7732218549a1561e18facc98e3a953a8",
+      "lastModificationDate": 1770558946323,
+      "contentHash": "69b9f9a43bff1ad7d86337cbeb26b015",
       "sourceName": "contracts/VaultFactory.sol",
       "solcConfig": {
         "version": "0.8.20",
@@ -444,7 +443,8 @@
       "imports": [
         "./PersonalVault.sol",
         "@openzeppelin/contracts/token/ERC20/IERC20.sol",
-        "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol"
+        "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol",
+        "@openzeppelin/contracts/access/Ownable.sol"
       ],
       "versionPragmas": [
         "^0.8.20"
