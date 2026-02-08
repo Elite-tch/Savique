@@ -2,11 +2,19 @@
 
 import '@rainbow-me/rainbowkit/styles.css';
 import {
-    getDefaultConfig,
+    connectorsForWallets,
     RainbowKitProvider,
     darkTheme,
 } from '@rainbow-me/rainbowkit';
-import { WagmiProvider } from 'wagmi';
+import {
+    rainbowWallet,
+    metaMaskWallet,
+    coinbaseWallet,
+    walletConnectWallet,
+    bifrostWallet,
+    ledgerWallet,
+} from '@rainbow-me/rainbowkit/wallets';
+import { WagmiProvider, createConfig } from 'wagmi';
 import { defineChain } from "viem";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { http } from "viem";
@@ -54,9 +62,35 @@ export const flareCoston2 = defineChain({
     testnet: true,
 });
 
-export const wagmiConfig = getDefaultConfig({
-    appName: 'Savique',
-    projectId: 'd76edd2ec72490269459a792d70e84fc', // Using the provided Project ID
+const projectId = 'd76edd2ec72490269459a792d70e84fc';
+
+const connectors = connectorsForWallets(
+    [
+        {
+            groupName: 'Flare Ecosystem',
+            wallets: [
+                bifrostWallet,
+                walletConnectWallet,
+                metaMaskWallet,
+            ],
+        },
+        {
+            groupName: 'Others',
+            wallets: [
+                ledgerWallet,
+                coinbaseWallet,
+                rainbowWallet,
+            ],
+        },
+    ],
+    {
+        appName: 'Savique',
+        projectId,
+    }
+);
+
+export const wagmiConfig = createConfig({
+    connectors,
     chains: [flareCoston2, flare],
     transports: {
         [flareCoston2.id]: http(undefined, {
@@ -72,7 +106,7 @@ export const wagmiConfig = getDefaultConfig({
             retryDelay: 2000,
         }),
     },
-    ssr: true, // If your dApp uses server side rendering (SSR)
+    ssr: true,
 });
 
 const queryClient = new QueryClient();

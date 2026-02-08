@@ -58,16 +58,16 @@ export function VaultPreviewCard({ address, index }: { address: `0x${string}`; i
     const isLocked = new Date() < unlockDate;
 
     return (
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.1 }}>
-            <Link href={`/dashboard/savings/${address}`}>
-                <Card className="bg-zinc-900/40 border-zinc-800/50 hover:border-zinc-700 transition-all cursor-pointer group p-8">
-                    <div className="flex justify-between items-start mb-3">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.1 }} className="h-full">
+            <Link href={`/dashboard/savings/${address}`} className="h-full block">
+                <Card className="bg-zinc-900/40 border-zinc-800/50 hover:border-zinc-700 transition-all cursor-pointer group p-8 h-full flex flex-col">
+                    <div className="flex justify-between items-start mb-4">
                         <h3 className="text-lg font-bold text-white truncate">{purpose || "Loading..."}</h3>
-                        <div className={`px-2 py-1 rounded text-xs font-medium ${isLocked ? 'bg-orange-500/10 text-orange-400' : 'bg-green-500/10 text-green-400'}`}>
+                        <div className={`px-2 py-1 rounded text-xs font-medium shrink-0 ${isLocked ? 'bg-orange-500/10 text-orange-400' : 'bg-green-500/10 text-green-400'}`}>
                             {isLocked ? 'Locked' : 'Unlocked'}
                         </div>
                     </div>
-                    <div className="space-y-3">
+                    <div className="space-y-4 mt-auto">
                         <div className="flex justify-between text-sm">
                             <span className="text-gray-400">Balance:</span>
                             <span className="text-white font-medium">${parseFloat(balance).toFixed(2)}</span>
