@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Rocket, AlertTriangle,ShieldCheck, Coins, Lock, Calendar, TrendingUp, Info, Plus, Wallet, Receipt, Loader2, Check } from "lucide-react";
+import { ArrowLeft, Rocket, AlertTriangle, ShieldCheck, Coins, Lock, Calendar, TrendingUp, Info, Plus, Wallet, Receipt, Loader2, Check } from "lucide-react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -498,7 +498,7 @@ export default function CreatePersonalVault() {
             <div className="grid md:grid-cols-3 gap-6">
                 {/* Main Form */}
                 <div className="md:col-span-2">
-                    <Card className="p-8">
+                    <Card className="md:p-8">
                         <div className="mb-8">
                             <h2 className="text-3xl font-bold text-white mb-2">Commit Your Savings</h2>
                             <p className="text-gray-400">Lock your USDT0 to reach your goals and earn a success bonus upon completion.</p>
@@ -594,12 +594,12 @@ export default function CreatePersonalVault() {
 
                             {/* Lock Duration */}
                             <div className="space-y-3">
-                                <div className="flex justify-between items-center">
+                                <div className="flex justify-between md:flex-row flex-col gap-2 md:items-center">
                                     <label className="text-sm font-semibold text-white flex items-center gap-2">
                                         <Calendar className="w-4 h-4 text-primary" />
                                         Lock Duration
                                     </label>
-                                    <div className="flex bg-white/5 p-1 rounded-lg border border-white/10">
+                                    <div className="flex bg-white/5 p-1 rounded-lg border justify-end w-fit ml-auto border-white/10">
                                         {(['minutes', 'hours', 'days'] as const).map((u) => (
                                             <button
                                                 key={u}

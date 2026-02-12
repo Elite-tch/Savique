@@ -299,12 +299,14 @@ export default function Dashboard() {
             {/* Action Row */}
             <div className="flex justify-between md:flex-row flex-col gap-3 md:items-center">
                 <h2 className="text-2xl font-bold text-white">Recent Savings</h2>
-                <div className="flex gap-4 items-center">
+                <div className="flex md:flex-row flex-col gap-4 md:items-center">
+                   <div className=" flex justify-end"> 
                     <Link href="/dashboard/savings">
                         <Button variant="ghost" className="text-gray-400 hover:text-white">
                             View All
                         </Button>
                     </Link>
+                    </div>
                     <Link href="/dashboard/create">
                         <Button className="gap-2 bg-primary text-white hover:bg-primary/90">
                             <Plus className="w-4 h-4" /> Create New Savings

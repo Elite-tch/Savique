@@ -830,7 +830,7 @@ export default function VaultDetailPage() {
                                 <Button
                                     variant="ghost"
                                     size="sm"
-                                    className="w-full text-zinc-500 hover:text-red-400 hover:bg-red-500/5 mt-2"
+                                    className="w-full border-white/5 border py-3 text-zinc-500 hover:text-red-400 hover:bg-red-500/5 mt-2"
                                     onClick={() => setIsBreakModalOpen(true)}
                                 >
                                     <AlertTriangle className="w-4 h-4 mr-2" />

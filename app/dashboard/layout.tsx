@@ -189,6 +189,14 @@ function SidebarContent({ pathname, onNavigate }: { pathname: string; onNavigate
             </nav>
 
             <div className="p-4 border-t border-white/10">
+                {/* Mobile-only wallet connect info */}
+                <div className="md:hidden mb-4">
+                    <ConnectButton
+                        accountStatus="full"
+                        showBalance={false}
+                        chainStatus="icon"
+                    />
+                </div>
                 <div className="bg-white/5 rounded-xl p-4">
                     <p className="text-xs text-center text-gray-500 mb-2">Savique v1.0</p>
                 </div>
@@ -261,7 +269,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
                     <div className="flex items-center gap-4">
                         {isConnected ? (
-                            <div className="flex items-center gap-4">
+                            <div className="flex items-center md:gap-4">
+
                                 <NotificationBell />
                                 <ReceiptSync />
                                 <div className="hidden md:block">
@@ -269,13 +278,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                                         accountStatus="address"
                                         showBalance={false}
                                         chainStatus="icon"
-                                    />
-                                </div>
-                                <div className="md:hidden">
-                                    <ConnectButton
-                                        accountStatus="avatar"
-                                        showBalance={false}
-                                        chainStatus="none"
                                     />
                                 </div>
                             </div>
@@ -289,26 +291,27 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                             </ConnectButton.Custom>
                         )}
                     </div>
-                </header>
+                </header >
 
                 {/* Content */}
-                <main className="flex-1 p-4 md:p-8 overflow-x-hidden">
+                < main className="flex-1 p-4 md:p-8 overflow-x-hidden" >
                     <div className="max-w-7xl mx-auto w-full">
                         {children}
 
                     </div>
-                </main>
+                </main >
 
                 {/* Mobile Menu FAB */}
-                <Button
+                < Button
                     size="icon"
                     className="fixed bottom-6 flex gap-2 px-3 right-6 z-50 md:hidden rounded-full shadow-lg shadow-primary/25 bg-primary text-white hover:bg-primary/90 h-12 w-fit"
-                    onClick={() => setIsMobileMenuOpen(true)}
+                    onClick={() => setIsMobileMenuOpen(true)
+                    }
                 >
                     <Menu className="w-6 h-6" />  <span className="text-xl">Menu</span>
-                </Button>
-            </div>
-        </div>
+                </Button >
+            </div >
+        </div >
     );
 }
 

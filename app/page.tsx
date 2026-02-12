@@ -97,13 +97,13 @@ export default function LandingPage() {
                         transition={{ duration: 0.8 }}
                         className="relative"
                     >
-                        {/* Glow effect backdrops */}
-                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%]  rounded-full blur-[120px] -z-10" />
-
-                        <InteractiveMockDashboard />
+                        <div className="hidden md:block">
+ <InteractiveMockDashboard />
+                        </div>
+                       
 
                         {/* Floating Labels / Steps */}
-                        <div className="grid md:grid-cols-3 gap-6 mt-16 bg-zinc-900/40 p-10 rounded-[2.5rem] border border-white/5 md:w-[95%] mx-auto backdrop-blur-xl shadow-2xl relative">
+                        <div className="grid md:grid-cols-3 gap-6 mt-16 bg-zinc-900/40 p-4 md:p-10 rounded-[2.5rem] border border-white/5 md:w-[95%] mx-auto backdrop-blur-xl shadow-2xl relative">
                             <motion.div 
                                 whileHover={{ 
                                     backgroundColor: "rgba(230, 32, 88, 0.05)", 
