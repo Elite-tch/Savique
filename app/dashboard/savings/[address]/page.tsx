@@ -13,7 +13,7 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { VaultBreakModal } from "@/components/VaultBreakModal";
 import { useProofRails } from "@proofrails/sdk/react";
-import { saveReceipt, getVaultByAddress, SavedVault, updateReceipt, saveVault, getReceiptsByVault, Receipt } from "@/lib/receiptService";
+import { saveReceipt, getVaultByAddress, SavedVault, updateReceipt, saveVault, getReceiptsByVault, Receipt, getAutoSavingsConfig, AutoSavingsConfig } from "@/lib/receiptService";
 import { createNotification } from "@/lib/notificationService";
 import { getUserProfile } from "@/lib/userService";
 import { Progress } from "../../../../components/ui/progress";
@@ -86,6 +86,8 @@ export default function VaultDetailPage() {
     const [topUpStep, setTopUpStep] = useState<'idle' | 'approving' | 'depositing' | 'done'>('idle');
     const [topUpTxHash, setTopUpTxHash] = useState<`0x${string}` | undefined>(undefined);
     const [withdrawalReceipt, setWithdrawalReceipt] = useState<Receipt | null>(null);
+    const [autoSaveConfig, setAutoSaveConfig] = useState<AutoSavingsConfig | null>(null);
+    const [isApprovingVault, setIsApprovingVault] = useState(false);
 
     useEffect(() => {
         const fetchVault = async () => {
@@ -93,10 +95,14 @@ export default function VaultDetailPage() {
                 const data = await getVaultByAddress(address);
                 setVaultData(data);
 
-                // Fetch receipts to find withdrawal info
+                // Fetch receipts
                 const receipts = await getReceiptsByVault(address);
                 const wr = receipts.find(r => r.type === 'completed' || r.type === 'breaked');
                 if (wr) setWithdrawalReceipt(wr);
+
+                // Fetch Auto-Save Config
+                const asConfig = await getAutoSavingsConfig(address);
+                setAutoSaveConfig(asConfig);
             }
         };
         fetchVault();
@@ -591,6 +597,10 @@ export default function VaultDetailPage() {
             // Force the next step to skip the allowance check, as we just approved
             handleTopUp(true);
             refetchAllowance();
+        } else if (isSuccess && receipt && isApprovingVault) {
+            toast.success("Vault Authorized!", toastStyle);
+            setIsApprovingVault(false);
+            refetchAllowance();
         } else if (isSuccess && receipt && topUpStep === 'depositing') {
             if (receipt.status === 'reverted') {
                 toast.error("Deposit Reverted. Please check your balance.", toastStyle);
@@ -747,6 +757,75 @@ export default function VaultDetailPage() {
                             "{quote}"
                         </p>
                     </Card>
+
+                    {/* Auto-Deposit Health Card */}
+                    {!autoSaveConfig ? (
+                        <div className="p-4 border border-dashed border-white/10 rounded-xl text-center">
+                            <p className="text-[10px] text-zinc-600 uppercase font-bold tracking-widest">Auto-Deposit: Not Configured</p>
+                            <p className="text-[9px] text-zinc-700 mt-1 italic">Create a new savings with auto-deposit enabled to use this feature.</p>
+                        </div>
+                    ) : (
+                        <Card className={`p-4 border ${(!allowance || (allowance as bigint) < parseUnits(autoSaveConfig.amount, decimals as number || 18))
+                            ? 'bg-red-500/5 border-red-500/20'
+                            : 'bg-green-500/5 border-green-500/20'
+                            }`}>
+                            <div className="flex items-center justify-between mb-3">
+                                <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Auto-Deposit Setup {autoSaveConfig.isActive === false && "(Disabled)"}</p>
+                                <div className={`w-2 h-2 rounded-full animate-pulse ${(!allowance || (allowance as bigint) < parseUnits(autoSaveConfig.amount, decimals as number || 18))
+                                    ? 'bg-red-500'
+                                    : 'bg-green-500'
+                                    }`} />
+                            </div>
+
+                            <div className="space-y-3">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-xs text-zinc-400">Scheduled:</span>
+                                    <span className="text-xs font-bold text-white capitalize">{autoSaveConfig.frequency} @ {autoSaveConfig.executionTime}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-xs text-zinc-400">Amount:</span>
+                                    <span className="text-xs font-bold text-white">{autoSaveConfig.amount} USDT0</span>
+                                </div>
+
+                                {(!allowance || (allowance as bigint) < parseUnits(autoSaveConfig.amount, decimals as number || 18)) ? (
+                                    <div className="pt-2 space-y-3">
+                                        <div className="p-2 bg-red-500/10 rounded-lg flex gap-2">
+                                            <AlertTriangle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                                            <p className="text-[10px] text-red-400 leading-tight">
+                                                <strong>Action Required:</strong> You haven't approved the Vault to pull these funds. Auto-deposits will fail until authorized.
+                                            </p>
+                                        </div>
+                                        <Button
+                                            className="w-full bg-red-600 hover:bg-red-700 text-white text-xs py-2 h-auto font-bold"
+                                            onClick={() => {
+                                                setIsApprovingVault(true);
+                                                toastId.current = toast.loading("Authorizing Vault...", toastStyle);
+                                                writeContract({
+                                                    address: CONTRACTS.coston2.USDTToken,
+                                                    abi: ERC20_ABI,
+                                                    functionName: "approve",
+                                                    args: [address, parseUnits("1000000", decimals as number || 18)]
+                                                });
+                                            }}
+                                            disabled={isWithdrawPending}
+                                        >
+                                            <ShieldCheck className="w-3 h-3 mr-2" />
+                                            Authorize Auto-Deposit
+                                        </Button>
+                                    </div>
+                                ) : (
+                                    <div className="pt-2">
+                                        <div className="p-2 bg-green-500/10 rounded-lg flex gap-2 items-center">
+                                            <ShieldCheck className="w-4 h-4 text-green-500" />
+                                            <p className="text-[10px] text-green-400 font-bold">
+                                                Status: Fully Authorized & Healthy
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </Card>
+                    )}
 
                     {/* Beneficiary Info */}
                     {beneficiary && beneficiary !== '0x0000000000000000000000000000000000000000' && (

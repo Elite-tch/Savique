@@ -1,7 +1,7 @@
 // -------------------- Config --------------------
 export const CONTRACTS = {
     coston2: {
-        VaultFactory: "0x4E70a85B1553ef34128C13C52B81A5862e4A11Dc" as `0x${string}`,
+        VaultFactory: "0xfB3e3fc852a2178061F44C5FBd6D3b662c278b0d" as `0x${string}`,
         USDTToken: "0xC1A5B41512496B80903D1f32d6dEa3a73212E71F" as `0x${string}`,
     },
 } as const;
@@ -51,6 +51,16 @@ export const VAULT_FACTORY_ABI = [
     {
         inputs: [{ name: "_vault", type: "address" }],
         name: "triggerBeneficiaryClaim",
+        outputs: [],
+        stateMutability: "nonpayable",
+        type: "function"
+    },
+    {
+        inputs: [
+            { name: "_vault", type: "address" },
+            { name: "_amount", type: "uint256" }
+        ],
+        name: "executeAutoDeposit",
         outputs: [],
         stateMutability: "nonpayable",
         type: "function"
@@ -117,6 +127,13 @@ export const VAULT_ABI = [
     {
         inputs: [],
         name: "claimByBeneficiary",
+        outputs: [],
+        stateMutability: "nonpayable",
+        type: "function"
+    },
+    {
+        inputs: [{ name: "amount", type: "uint256" }],
+        name: "depositFromFactory",
         outputs: [],
         stateMutability: "nonpayable",
         type: "function"

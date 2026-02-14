@@ -98,4 +98,20 @@ contract VaultFactory is Ownable {
     function triggerBeneficiaryClaim(address _vault) external onlyOwner {
         PersonalVault(payable(_vault)).claimByBeneficiary();
     }
+
+    /**
+     * @dev Executes an auto-deposit by pulling from owner to vault
+     * User must have approved the FACTORY.
+     */
+    function executeAutoDeposit(address _vault, uint256 _amount) external onlyOwner {
+        require(isVault[_vault], "Not a system vault");
+        
+        address vaultOwner = PersonalVault(payable(_vault)).owner();
+        
+        // Factory pulls from user (requires Factory to be spender)
+        IERC20(usdtToken).safeTransferFrom(vaultOwner, _vault, _amount);
+        
+        // Notify vault to record deposit
+        PersonalVault(payable(_vault)).depositFromFactory(_amount);
+    }
 }

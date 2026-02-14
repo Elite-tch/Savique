@@ -31,7 +31,7 @@ Users can now set specific financial targets (e.g., "Property Deposit," "Emergen
 Unlike static savings contracts, Savique allows you to "fuel" your goals. You can add funds to any active savings plan at any time, compounding your commitment without extending the lock-up period.
 
 ### 3. Emergency Beneficiary Protocol (Inheritance)
-The ultimate peace of mind. Users can designate an emergency beneficiary address. If the owner becomes inactive after the lock period ends, the protocol allows for an admin-authorized release to the beneficiary, ensuring wealth is never lost to the void.
+The ultimate peace of mind. Users can designate an emergency beneficiary address. If the owner becomes inactive after the lock period ends, the protocol allows beneficiary to withdraw funds through safety and recovery way ensuring wealth is never lost to the void.
 
 ### 4. Professional Notification System
 Stay connected to your wealth. Savique integrates an automated notification system that sends:

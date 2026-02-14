@@ -328,3 +328,57 @@ export async function getAllReceipts(): Promise<Receipt[]> {
     }
 }
 
+/**
+ * --- Auto-Savings Configuration ---
+ */
+export interface AutoSavingsConfig {
+    id?: string;
+    vaultAddress: string;
+    ownerAddress: string;
+    amount: string;
+    frequency: 'daily' | 'weekly' | 'monthly' | 'minutely';
+    executionDay?: number; // 0-6 for weekly (Sun-Sat), 1-31 for monthly
+    executionTime: string; // "HH:mm"
+    lastRunAt: number;
+    nextRunAt: number;
+    isActive: boolean;
+    failures: number;
+}
+
+const AUTO_SAVINGS_COLLECTION = 'auto_savings';
+
+export async function saveAutoSavingsConfig(config: AutoSavingsConfig): Promise<string> {
+    try {
+        const colRef = collection(db, AUTO_SAVINGS_COLLECTION);
+        const docRef = await addDoc(colRef, {
+            ...config,
+            vaultAddress: config.vaultAddress.toLowerCase(),
+            ownerAddress: config.ownerAddress.toLowerCase(),
+            createdAt: Timestamp.now()
+        });
+        console.log('[Firebase] Auto-savings config saved:', docRef.id);
+        return docRef.id;
+    } catch (error) {
+        console.error('[Firebase] Error saving auto-savings config:', error);
+        throw error;
+    }
+}
+
+export async function getAutoSavingsConfig(vaultAddress: string): Promise<AutoSavingsConfig | null> {
+    try {
+        const colRef = collection(db, AUTO_SAVINGS_COLLECTION);
+        const q = query(colRef, where('vaultAddress', '==', vaultAddress.toLowerCase()));
+        const snapshot = await getDocs(q);
+
+        if (snapshot.empty) return null;
+
+        // Return the one that is active if possible
+        const activeDoc = snapshot.docs.find(d => d.data().isActive);
+        const doc = activeDoc || snapshot.docs[0];
+
+        return { id: doc.id, ...doc.data() } as AutoSavingsConfig;
+    } catch (error) {
+        console.error('[Firebase] Error retrieving auto-savings config:', error);
+        return null;
+    }
+}

@@ -338,7 +338,7 @@ export async function sendNotificationEmail(type: EmailType, data: EmailData) {
                                             <p style="margin: 0; color: #A1A1AA; font-size: 12px;">
                                                 Savique Protocol • Decentralized Savings on Flare Network
                                             </p>
-                                        </td>
+                                      </td>
                                     </tr>
                                 </table>
                             </td>

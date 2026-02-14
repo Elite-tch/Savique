@@ -151,8 +151,8 @@
       ]
     },
     "C:\\Users\\pc\\Documents\\MY-PROJECTS\\safevault\\contracts\\PersonalVault.sol": {
-      "lastModificationDate": 1770558081435,
-      "contentHash": "de1d1f940d3f0323092e359fb1ab28d1",
+      "lastModificationDate": 1770977278249,
+      "contentHash": "785140d779515a07ed4b25d5fa9e3e7a",
       "sourceName": "contracts/PersonalVault.sol",
       "solcConfig": {
         "version": "0.8.20",
@@ -413,8 +413,8 @@
       ]
     },
     "C:\\Users\\pc\\Documents\\MY-PROJECTS\\safevault\\contracts\\VaultFactory.sol": {
-      "lastModificationDate": 1770558946323,
-      "contentHash": "69b9f9a43bff1ad7d86337cbeb26b015",
+      "lastModificationDate": 1770977307124,
+      "contentHash": "b9112f3f6a97c81903d6fcb92a1d88a8",
       "sourceName": "contracts/VaultFactory.sol",
       "solcConfig": {
         "version": "0.8.20",
@@ -606,88 +606,6 @@
       ],
       "artifacts": [
         "TestToken"
-      ]
-    },
-    "C:\\Users\\pc\\Documents\\MY-PROJECTS\\safevault\\contracts\\KineticVaultFactory.sol": {
-      "lastModificationDate": 1770702663413,
-      "contentHash": "e0661dcb9f27a678a194669ab0148285",
-      "sourceName": "contracts/KineticVaultFactory.sol",
-      "solcConfig": {
-        "version": "0.8.20",
-        "settings": {
-          "evmVersion": "paris",
-          "optimizer": {
-            "enabled": false,
-            "runs": 200
-          },
-          "outputSelection": {
-            "*": {
-              "*": [
-                "abi",
-                "evm.bytecode",
-                "evm.deployedBytecode",
-                "evm.methodIdentifiers",
-                "metadata"
-              ],
-              "": [
-                "ast"
-              ]
-            }
-          }
-        }
-      },
-      "imports": [
-        "./KineticVault.sol",
-        "@openzeppelin/contracts/token/ERC20/IERC20.sol",
-        "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol",
-        "@openzeppelin/contracts/access/Ownable.sol"
-      ],
-      "versionPragmas": [
-        "^0.8.20"
-      ],
-      "artifacts": [
-        "KineticVaultFactory"
-      ]
-    },
-    "C:\\Users\\pc\\Documents\\MY-PROJECTS\\safevault\\contracts\\KineticVault.sol": {
-      "lastModificationDate": 1770702679651,
-      "contentHash": "6f33a9bda2867a88be4ae3d35314b422",
-      "sourceName": "contracts/KineticVault.sol",
-      "solcConfig": {
-        "version": "0.8.20",
-        "settings": {
-          "evmVersion": "paris",
-          "optimizer": {
-            "enabled": false,
-            "runs": 200
-          },
-          "outputSelection": {
-            "*": {
-              "*": [
-                "abi",
-                "evm.bytecode",
-                "evm.deployedBytecode",
-                "evm.methodIdentifiers",
-                "metadata"
-              ],
-              "": [
-                "ast"
-              ]
-            }
-          }
-        }
-      },
-      "imports": [
-        "./AbstractVault.sol",
-        "@openzeppelin/contracts/token/ERC20/IERC20.sol",
-        "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol"
-      ],
-      "versionPragmas": [
-        "^0.8.20"
-      ],
-      "artifacts": [
-        "IKToken",
-        "KineticVault"
       ]
     }
   }

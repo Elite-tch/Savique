@@ -60,6 +60,21 @@ contract PersonalVault is AbstractVault {
     }
 
     /**
+     * @dev Triggers a deposit from the owner's wallet using open allowance.
+     * Can be called by the Owner (manual) or the Factory/Admin (auto-save).
+     */
+    /**
+     * @dev Called by the factory to record a deposit pushed to this vault.
+     */
+    function depositFromFactory(uint256 amount) external nonReentrant {
+        require(msg.sender == factory, "Only Factory");
+        require(amount > 0, "Amount > 0");
+        
+        emit Deposited(owner(), amount, block.timestamp);
+        _onDeposit(owner(), amount);
+    }
+
+    /**
      * @dev Withdraws entire token balance
      */
     function withdraw() external onlyOwner nonReentrant {
