@@ -15,7 +15,6 @@ import { useProofRails } from "@proofrails/sdk/react";
 import { saveReceipt, saveVault } from "@/lib/receiptService";
 import { createNotification } from "@/lib/notificationService";
 import { getUserProfile } from "@/lib/userService";
-import { saveAutoSavingsConfig } from "@/lib/receiptService";
 
 const MAX_UINT256 = BigInt("115792089237316195423570985008687907853269984665640564039457584007913129639935");
 
@@ -109,13 +108,6 @@ export default function CreatePersonalVault() {
         duration: "30",
         durationUnit: "days" as "minutes" | "hours" | "days",
         beneficiary: "",
-
-        // Auto-Savings Config
-        isAutoSaveEnabled: false,
-        autoSaveAmount: "",
-        autoSaveFrequency: "daily" as "daily" | "weekly" | "monthly" | "minutely",
-        autoSaveTime: "12:00",
-        autoSaveDay: "1"
     });
 
     const [customDuration, setCustomDuration] = useState("");
@@ -340,48 +332,6 @@ export default function CreatePersonalVault() {
     const handleProofGeneration = async (txHashStr: string, vaultAddrOverride?: string) => {
         const targetVault = (vaultAddrOverride || createdVaultAddress) as `0x${string}`;
 
-        if (formData.isAutoSaveEnabled && formData.autoSaveAmount) {
-            try {
-                const firstRun = () => {
-                    const now = new Date();
-                    const [hours, minutes] = formData.autoSaveTime.split(':').map(Number);
-                    const scheduledDate = new Date();
-                    scheduledDate.setHours(hours, minutes, 0, 0);
-
-                    if (formData.autoSaveFrequency === 'minutely') return Date.now() + 60000;
-                    if (formData.autoSaveFrequency === 'daily') {
-                        if (scheduledDate.getTime() <= now.getTime()) scheduledDate.setDate(scheduledDate.getDate() + 1);
-                    } else if (formData.autoSaveFrequency === 'weekly') {
-                        const targetDay = parseInt(formData.autoSaveDay);
-                        const currentDay = now.getDay() || 7;
-                        let daysUntil = targetDay - currentDay;
-                        if (daysUntil < 0 || (daysUntil === 0 && scheduledDate.getTime() <= now.getTime())) daysUntil += 7;
-                        scheduledDate.setDate(scheduledDate.getDate() + daysUntil);
-                    } else if (formData.autoSaveFrequency === 'monthly') {
-                        const targetDate = parseInt(formData.autoSaveDay);
-                        scheduledDate.setDate(targetDate);
-                        if (scheduledDate.getTime() <= now.getTime()) scheduledDate.setMonth(scheduledDate.getMonth() + 1);
-                    }
-                    return scheduledDate.getTime();
-                };
-
-                await saveAutoSavingsConfig({
-                    vaultAddress: targetVault.toLowerCase(),
-                    ownerAddress: address!.toLowerCase(),
-                    amount: formData.autoSaveAmount,
-                    frequency: formData.autoSaveFrequency,
-                    executionDay: parseInt(formData.autoSaveDay),
-                    executionTime: formData.autoSaveTime,
-                    lastRunAt: 0,
-                    nextRunAt: firstRun(),
-                    isActive: true,
-                    failures: 0
-                });
-            } catch (err) {
-                console.error("❌ Failed to save auto-deposit config:", err);
-            }
-        }
-
         try {
             await saveVault({
                 vaultAddress: targetVault,
@@ -414,10 +364,26 @@ export default function CreatePersonalVault() {
                 receiptResult.id
             );
 
+            const unlockDateStr = new Date(unlockDate).toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+
             try {
                 const profile = await getUserProfile(address!);
-                if (profile?.email && profile.notificationPreferences.deposits) {
-                    await fetch('/api/notify', {
+                console.log("[Email] Profile fetched:", profile?.email);
+
+                // Add safety check for notificationPreferences
+                const canSendEmail = profile?.email && (
+                    !profile.notificationPreferences || // default to true if missing
+                    profile.notificationPreferences.deposits
+                );
+
+                if (canSendEmail) {
+                    console.log("[Email] Sending DEPOSIT_CONFIRMED notification...");
+                    const response = await fetch('/api/notify', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -426,12 +392,22 @@ export default function CreatePersonalVault() {
                             purpose: formData.purpose,
                             amount: formData.amount,
                             txHash: txHashStr,
+                            unlockDate: unlockDateStr,
                             proofRailsId: receiptResult.id,
                             targetAmount: formData.targetAmount || formData.amount
                         })
                     });
+                    const result = await response.json();
+                    console.log("[Email] Notification response:", result);
+                } else {
+                    console.log("[Email] Notification skipped:", {
+                        hasEmail: !!profile?.email,
+                        depositsPref: profile?.notificationPreferences?.deposits
+                    });
                 }
-            } catch (emailErr) { }
+            } catch (emailErr) {
+                console.error("[Email] Error in handleProofGeneration email flow:", emailErr);
+            }
 
             await saveReceipt({
                 walletAddress: address!.toLowerCase(),
@@ -450,6 +426,52 @@ export default function CreatePersonalVault() {
             setTimeout(() => router.push("/dashboard/savings"), 1500);
         } catch (e: any) {
             console.error("❌ Proof generation failed:", e);
+
+            // Calculate unlock date for fallback email as well
+            const unlockDateStr = new Date(unlockDate).toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+
+            // Fallback email sending even if ProofRails fails
+            try {
+                const profile = await getUserProfile(address!);
+                console.log("[Email Fallback] Profile fetched:", profile?.email);
+
+                const canSendEmail = profile?.email && (
+                    !profile.notificationPreferences || // default to true if missing
+                    profile.notificationPreferences.deposits
+                );
+
+                if (canSendEmail) {
+                    console.log("[Email Fallback] Sending DEPOSIT_CONFIRMED notification...");
+                    const response = await fetch('/api/notify', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            type: 'DEPOSIT_CONFIRMED',
+                            userEmail: profile.email,
+                            purpose: formData.purpose,
+                            amount: formData.amount,
+                            txHash: txHashStr,
+                            unlockDate: unlockDateStr,
+                            targetAmount: formData.targetAmount || formData.amount
+                        })
+                    });
+                    const result = await response.json();
+                    console.log("[Email Fallback] Notification response:", result);
+                } else {
+                    console.log("[Email Fallback] Notification skipped:", {
+                        hasEmail: !!profile?.email,
+                        depositsPref: profile?.notificationPreferences?.deposits
+                    });
+                }
+            } catch (emailErr) {
+                console.error("[Email Fallback] Error in handleProofGeneration email flow:", emailErr);
+            }
+
             await saveReceipt({
                 walletAddress: address!.toLowerCase(),
                 vaultAddress: targetVault,
@@ -564,100 +586,7 @@ export default function CreatePersonalVault() {
                                 </p>
                             </div>
 
-                            <div className="p-4 bg-white/5 border border-white/10 rounded-xl space-y-4">
-                                <div className="flex items-center justify-between">
-                                    <div className="space-y-1">
-                                        <label className="text-sm font-semibold text-white flex items-center gap-2">
-                                            <Rocket className="w-4 h-4 text-primary" />
-                                            Enable Auto-Deposit
-                                        </label>
-                                        <p className="text-xs text-gray-400">Automatically grow your savings by scheduling regular deposits.</p>
-                                    </div>
-                                    <div
-                                        onClick={() => !isProcessing && setFormData(prev => ({ ...prev, isAutoSaveEnabled: !prev.isAutoSaveEnabled }))}
-                                        className={`w-12 h-6 rounded-full cursor-pointer transition-colors relative ${formData.isAutoSaveEnabled ? 'bg-primary' : 'bg-gray-600'}`}
-                                    >
-                                        <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${formData.isAutoSaveEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
-                                    </div>
-                                </div>
 
-                                {formData.isAutoSaveEnabled && (
-                                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="space-y-6 pt-4 border-t border-white/10">
-                                        <div className="space-y-2">
-                                            <label className="text-sm font-semibold text-gray-400">Deposit Amount</label>
-                                            <div className="relative">
-                                                <input
-                                                    type="number"
-                                                    placeholder="10.00"
-                                                    step="0.01"
-                                                    className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary/50 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                                    value={formData.autoSaveAmount}
-                                                    onChange={(e) => setFormData({ ...formData, autoSaveAmount: e.target.value })}
-                                                />
-                                                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-gray-500 font-bold">USDT0</span>
-                                            </div>
-                                        </div>
-
-                                        <div className="space-y-3">
-                                            <label className="text-sm font-semibold text-gray-400">Frequency</label>
-                                            <div className="flex bg-white/5 p-1 rounded-xl border border-white/10 w-full overflow-x-auto">
-                                                {(['daily', 'weekly', 'monthly', 'minutely'] as const).map((f) => (
-                                                    <button
-                                                        key={f}
-                                                        type="button"
-                                                        onClick={() => setFormData({ ...formData, autoSaveFrequency: f })}
-                                                        className={`flex-1 min-w-[80px] px-3 py-2 rounded-lg text-xs font-bold transition-all capitalize ${formData.autoSaveFrequency === f ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-gray-500 hover:text-gray-300'}`}
-                                                    >
-                                                        {f === 'minutely' ? 'Testing' : f}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            {formData.autoSaveFrequency === 'weekly' && (
-                                                <CustomSelect
-                                                    label="Run Every"
-                                                    value={formData.autoSaveDay}
-                                                    onChange={(val) => setFormData({ ...formData, autoSaveDay: val })}
-                                                    options={[
-                                                        { value: "1", label: "Monday" },
-                                                        { value: "2", label: "Tuesday" },
-                                                        { value: "3", label: "Wednesday" },
-                                                        { value: "4", label: "Thursday" },
-                                                        { value: "5", label: "Friday" },
-                                                        { value: "6", label: "Saturday" },
-                                                        { value: "7", label: "Sunday" },
-                                                    ]}
-                                                />
-                                            )}
-                                            {formData.autoSaveFrequency === 'monthly' && (
-                                                <CustomSelect
-                                                    label="Run on Date"
-                                                    value={formData.autoSaveDay}
-                                                    onChange={(val) => setFormData({ ...formData, autoSaveDay: val })}
-                                                    options={Array.from({ length: 28 }, (_, i) => ({
-                                                        value: (i + 1).toString(),
-                                                        label: (i + 1).toString()
-                                                    }))}
-                                                />
-                                            )}
-                                            {formData.autoSaveFrequency !== 'minutely' && (
-                                                <div className="space-y-2">
-                                                    <label className="text-xs text-gray-400">Execution Time</label>
-                                                    <input
-                                                        type="time"
-                                                        required
-                                                        className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-primary/50 focus:outline-none [color-scheme:dark]"
-                                                        value={formData.autoSaveTime}
-                                                        onChange={(e) => setFormData({ ...formData, autoSaveTime: e.target.value })}
-                                                    />
-                                                </div>
-                                            )}
-                                        </div>
-                                    </motion.div>
-                                )}
-                            </div>
 
                             <div className="grid md:grid-cols-2 gap-6">
                                 <div className="space-y-2">

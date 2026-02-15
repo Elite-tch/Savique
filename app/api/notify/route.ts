@@ -18,8 +18,11 @@ export async function POST(req: NextRequest) {
         } = body;
 
         if (!type || !userEmail || !purpose) {
+            console.warn('[API Notify] Missing required fields:', { type, userEmail, purpose });
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
         }
+
+        console.log(`[API Notify] Sending ${type} to ${userEmail}`);
 
         await sendNotificationEmail(type as EmailType, {
             userEmail,
