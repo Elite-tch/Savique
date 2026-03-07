@@ -17,6 +17,11 @@ import { usePublicClient } from "wagmi";
 import { VAULT_ABI } from "@/lib/contracts";
 import { formatUnits } from "viem";
 import { toast } from "sonner";
+import { useAdminEcosystem } from "../AdminEcosystemContext";
+import { DEVNET_SHIP_MINT, DEVNET_USDC_MINT, SAVIQUE_PROGRAM_ID } from "@/lib/solana";
+import { getAssociatedTokenAddressSync } from "@solana/spl-token";
+import { Connection, PublicKey as SolanaPubkey } from "@solana/web3.js";
+import { BN } from "@coral-xyz/anchor";
 
 const ITEMS_PER_PAGE = 8;
 
@@ -31,6 +36,8 @@ export default function ActiveSavingsPage() {
 
     const publicClient = usePublicClient();
 
+    const { ecosystem } = useAdminEcosystem();
+
     useEffect(() => {
         const load = async () => {
             try {
@@ -38,11 +45,13 @@ export default function ActiveSavingsPage() {
                 setVaults(v);
                 setReceipts(r);
 
-                if (publicClient) {
-                    const balances: Record<string, number> = {};
-                    const expirations: Record<string, number> = {};
+                const balances: Record<string, number> = {};
+                const expirations: Record<string, number> = {};
 
-                    await Promise.all(v.map(async (vault) => {
+                // Flare Loading
+                if (publicClient) {
+                    const flareVaults = v.filter(v2 => v2.vaultAddress.startsWith('0x'));
+                    await Promise.all(flareVaults.map(async (vault) => {
                         try {
                             const [bal, exp] = await Promise.all([
                                 publicClient.readContract({
@@ -60,9 +69,57 @@ export default function ActiveSavingsPage() {
                             expirations[vault.vaultAddress] = Number(exp) * 1000;
                         } catch (e) { }
                     }));
-                    setVaultBalances(balances);
-                    setVaultExpirations(expirations);
                 }
+
+                // Solana Loading
+                const solanaVaults = v.filter(v2 => v2.vaultAddress && !v2.vaultAddress.startsWith('0x'));
+                if (solanaVaults.length > 0) {
+                    const connection = new Connection("https://api.devnet.solana.com");
+
+                    await Promise.all(solanaVaults.map(async (vault) => {
+                        try {
+                            // Validate Base58
+                            if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(vault.vaultAddress)) {
+                                return;
+                            }
+
+                            const vaultPubkey = new SolanaPubkey(vault.vaultAddress);
+                            const isUsdc = vault.currency === 'USDC';
+                            const mint = isUsdc ? DEVNET_USDC_MINT : DEVNET_SHIP_MINT;
+
+                            const vaultTokenAccount = getAssociatedTokenAddressSync(
+                                mint,
+                                vaultPubkey,
+                                true
+                            );
+
+                            // Fetch balance and account info separately to handle uninitialized accounts
+                            try {
+                                const balInfo = await connection.getTokenAccountBalance(vaultTokenAccount);
+                                balances[vault.vaultAddress] = balInfo.value.uiAmount || 0;
+                            } catch (balErr) {
+                                // Likely account hasn't been created yet (no deposits)
+                                balances[vault.vaultAddress] = 0;
+                            }
+
+                            try {
+                                const accountInfo = await connection.getAccountInfo(vaultPubkey);
+                                if (accountInfo && accountInfo.data.length >= 176) {
+                                    const data = accountInfo.data;
+                                    const unlockTimestamp = data.readBigInt64LE(168); // 8 + 32 + 128
+                                    expirations[vault.vaultAddress] = Number(unlockTimestamp) * 1000;
+                                }
+                            } catch (accErr) {
+                                console.error(`Vault account info fetch failed for ${vault.vaultAddress}:`, accErr);
+                            }
+                        } catch (e) {
+                            console.error(`Error processing Solana vault ${vault.vaultAddress}:`, e);
+                        }
+                    }));
+                }
+
+                setVaultBalances(balances);
+                setVaultExpirations(expirations);
             } catch (e) {
                 toast.error("Failed to load active savings");
             } finally {
@@ -72,9 +129,22 @@ export default function ActiveSavingsPage() {
         load();
     }, [publicClient]);
 
+    // Reset pagination on ecosystem change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [ecosystem]);
+
     const activeList = useMemo(() => {
-        return vaults.filter(v => {
-            const isClosed = receipts.some(r => r.vaultAddress === v.vaultAddress && (r.type === 'breaked' || r.type === 'completed'));
+        const filteredVaults = ecosystem === 'all' ? vaults :
+            ecosystem === 'flare' ? vaults.filter(v => v.vaultAddress.startsWith('0x')) :
+                vaults.filter(v => !v.vaultAddress.startsWith('0x'));
+
+        const filteredReceipts = ecosystem === 'all' ? receipts :
+            ecosystem === 'flare' ? receipts.filter(r => r.walletAddress.startsWith('0x')) :
+                receipts.filter(r => !r.walletAddress.startsWith('0x'));
+
+        return filteredVaults.filter(v => {
+            const isClosed = filteredReceipts.some(r => r.vaultAddress === v.vaultAddress && (r.type === 'breaked' || r.type === 'completed'));
             const hasBalance = (vaultBalances[v.vaultAddress] || 0) > 0;
             const matchesSearch = v.vaultAddress.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 v.purpose?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -82,7 +152,7 @@ export default function ActiveSavingsPage() {
 
             return !isClosed && hasBalance && matchesSearch;
         }).sort((a, b) => (vaultExpirations[a.vaultAddress] || 0) - (vaultExpirations[b.vaultAddress] || 0));
-    }, [vaults, receipts, vaultBalances, vaultExpirations, searchQuery]);
+    }, [vaults, receipts, vaultBalances, vaultExpirations, searchQuery, ecosystem]);
 
     const paginatedActive = activeList.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
     const totalPages = Math.ceil(activeList.length / ITEMS_PER_PAGE);
@@ -132,12 +202,17 @@ export default function ActiveSavingsPage() {
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-2">
                                                 <Lock size={12} className="text-red-500" />
-                                                <span className="font-medium text-white">{vault.purpose || "Savings"}</span>
+                                                <div className="flex flex-col">
+                                                    <span className="font-medium text-white">{vault.purpose || "Savings"}</span>
+                                                    <span className={`text-[8px] font-bold w-fit mt-1 px-1.5 py-0.5 rounded border ${!vault.vaultAddress.startsWith('0x') ? 'border-indigo-500/30 text-indigo-400 bg-indigo-500/10' : 'border-orange-500/30 text-orange-400 bg-orange-500/10'}`}>
+                                                        {!vault.vaultAddress.startsWith('0x') ? 'SOLANA' : 'FLARE'}
+                                                    </span>
+                                                </div>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4 font-mono text-gray-400 text-xs">{vault.owner}</td>
+                                        <td className="px-6 py-4 font-mono text-gray-400 text-xs truncate max-w-[150px]">{vault.owner}</td>
                                         <td className="px-6 py-4 text-right font-bold text-emerald-400">
-                                            {vaultBalances[vault.vaultAddress]?.toFixed(2) || "0.00"} USDT
+                                            {vaultBalances[vault.vaultAddress]?.toFixed(2) || "0.00"} <span className="text-[10px] text-gray-500 font-normal">{!vault.vaultAddress.startsWith('0x') ? (vault.currency || 'SHIP') : 'USDT'}</span>
                                         </td>
                                         <td className="px-6 py-4 text-right">
                                             <div className="flex flex-col items-end">
@@ -152,7 +227,7 @@ export default function ActiveSavingsPage() {
                                                 variant="ghost"
                                                 size="sm"
                                                 className="h-8 w-8 p-0"
-                                                onClick={() => window.open(`https://coston2-explorer.flare.network/address/${vault.vaultAddress}`, '_blank')}
+                                                onClick={() => window.open(!vault.vaultAddress.startsWith('0x') ? `https://explorer.solana.com/address/${vault.vaultAddress}?cluster=devnet` : `https://coston2-explorer.flare.network/address/${vault.vaultAddress}`, '_blank')}
                                             >
                                                 <ExternalLink size={14} />
                                             </Button>

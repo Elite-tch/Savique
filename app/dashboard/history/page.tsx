@@ -13,8 +13,12 @@ import { toast } from "sonner";
 import { generateReceiptPDF } from "../../../lib/pdfGenerator";
 import { saveAs } from "file-saver";
 
+import { useEcosystemAccount } from "@/hooks/useEcosystemAccount";
+import { useEcosystem } from "@/context/EcosystemContext";
+
 export default function HistoryPage() {
-    const { address: currentAddress, isConnected, isConnecting, isReconnecting } = useAccount();
+    const { address: currentAddress, isConnected } = useEcosystemAccount();
+    const { isSolana } = useEcosystem();
 
 
     const [receipts, setReceipts] = useState<Receipt[]>([]);
@@ -68,7 +72,11 @@ export default function HistoryPage() {
     }, [currentAddress]);
 
     const viewOnExplorer = (txHash: string) => {
-        window.open(`https://coston2-explorer.flare.network/tx/${txHash}`, '_blank');
+        if (txHash.startsWith('0x')) {
+            window.open(`https://coston2-explorer.flare.network/tx/${txHash}`, '_blank');
+        } else {
+            window.open(`https://explorer.solana.com/tx/${txHash}?cluster=devnet`, '_blank');
+        }
     };
 
     if (!isConnected) {
@@ -90,10 +98,12 @@ export default function HistoryPage() {
             <div className="flex md:items-center justify-between md:flex-row flex-col gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-white mb-2">Transaction History</h1>
-                    <p className="text-gray-400">View your ProofRails verified transaction receipts</p>
+                    <p className="text-gray-400">
+                        {isSolana ? 'View your verified Solana transactions' : 'View your ProofRails verified transaction receipts'}
+                    </p>
                 </div>
 
-                {receipts.length > 0 && (
+                {receipts.length > 0 && !isSolana && (
                     <Button
                         onClick={() => setIsStatementModalOpen(true)}
                         className="gap-2 bg-primary hover:bg-primary/90 w-fit md:w-auto"
@@ -147,7 +157,9 @@ export default function HistoryPage() {
 
                                         <div>
                                             <div className="flex items-center gap-2 mb-1">
-                                                <h3 className="text-lg font-bold text-white">{receipt.purpose}</h3>
+                                                <h3 className="text-lg font-bold text-white">
+                                                    {receipt.purpose.replace('Sinking Fund Started: ', '')}
+                                                </h3>
                                                 {/* Tags */}
                                                 {receipt.type === 'breaked' && (
                                                     <span className="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-red-500/10 text-red-500 border border-red-500/20">Breaked Early</span>
@@ -181,7 +193,9 @@ export default function HistoryPage() {
                                     <div className="flex flex-col md:items-end gap-3">
                                         <div className="text-left md:text-right">
                                             <p className="text-xs text-gray-500 mb-1">Amount</p>
-                                            <p className="text-lg font-bold text-white">{receipt.amount} USDT0</p>
+                                            <p className="text-lg font-bold text-white">
+                                                {receipt.amount} {receipt.txHash.startsWith('0x') ? 'USDT0' : (receipt.currency || 'SHIP')}
+                                            </p>
                                             {receipt.penalty && (
                                                 <p className="text-xs text-red-500 font-medium mt-1">
                                                     -{receipt.penalty} Penalty
@@ -199,33 +213,37 @@ export default function HistoryPage() {
                                                 Explorer
                                             </Button>
 
-                                            <Button
-                                                size="sm"
-                                                variant="ghost"
-                                                onClick={() => generatePDF(receipt)}
-                                                disabled={isGeneratingReceiptId === receipt.id}
-                                                className="gap-2 text-zinc-400 hover:text-white"
-                                            >
-                                                {isGeneratingReceiptId === receipt.id ? (
-                                                    <Loader2 className="w-3 h-3 animate-spin" />
-                                                ) : (
-                                                    <Download className="w-3 h-3" />
-                                                )}
-                                                PDF
-                                            </Button>
+                                            {receipt.txHash.startsWith('0x') && (
+                                                <>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        onClick={() => generatePDF(receipt)}
+                                                        disabled={isGeneratingReceiptId === receipt.id}
+                                                        className="gap-2 text-zinc-400 hover:text-white"
+                                                    >
+                                                        {isGeneratingReceiptId === receipt.id ? (
+                                                            <Loader2 className="w-3 h-3 animate-spin" />
+                                                        ) : (
+                                                            <Download className="w-3 h-3" />
+                                                        )}
+                                                        PDF
+                                                    </Button>
 
-                                            {receipt.verified && receipt.proofRailsId ? (
-                                                <div className="px-3 py-2 bg-green-500/10 border border-green-500/20 rounded-md flex items-center gap-2">
-                                                    <CheckCircle className="w-3 h-3 text-green-500" />
-                                                    <button
-                                                        onClick={() => window.open(`https://proofrails-clone-middleware.onrender.com/receipt/${receipt.proofRailsId}`, '_blank')}
-                                                        className="text-xs cursor-pointer text-green-400 font-medium bg-transparent hover:underline">ProofRails Verified </button>
-                                                </div>
-                                            ) : (
-                                                <div className="px-3 py-2 bg-orange-500/10 border border-orange-500/20 rounded-md flex items-center gap-2">
-                                                    <Clock className="w-4 h-4 text-orange-400" />
-                                                    <span className="text-xs text-orange-400 font-medium">Pending</span>
-                                                </div>
+                                                    {receipt.verified && receipt.proofRailsId ? (
+                                                        <div className="px-3 py-2 bg-green-500/10 border border-green-500/20 rounded-md flex items-center gap-2">
+                                                            <CheckCircle className="w-3 h-3 text-green-500" />
+                                                            <button
+                                                                onClick={() => window.open(`https://proofrails-clone-middleware.onrender.com/receipt/${receipt.proofRailsId}`, '_blank')}
+                                                                className="text-xs cursor-pointer text-green-400 font-medium bg-transparent hover:underline">ProofRails Verified </button>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="px-3 py-2 bg-orange-500/10 border border-orange-500/20 rounded-md flex items-center gap-2">
+                                                            <Clock className="w-4 h-4 text-orange-400" />
+                                                            <span className="text-xs text-orange-400 font-medium">Pending</span>
+                                                        </div>
+                                                    )}
+                                                </>
                                             )}
                                         </div>
                                     </div>

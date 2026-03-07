@@ -24,7 +24,7 @@ export default function LandingPage() {
                             "price": "0",
                             "priceCurrency": "USD"
                         },
-                        "description": "Smart Commitment Protocol for your capital on Flare Network. Savings with verifiable proofs.",
+                        "description": "Smart Commitment Protocol for your capital. Savings with verifiable proofs.",
                         "aggregateRating": {
                             "@type": "AggregateRating",
                             "ratingValue": "4.8",
@@ -73,7 +73,7 @@ export default function LandingPage() {
                         </h1>
                         <p className="text-xl text-gray-400 mb-10 max-w-2xl mx-auto">
                             Lock funds for specific goals, enforce discipline with smart contracts,
-                            and generate verifiable financial proofs on the Flare Network.
+                            and generate verifiable financial proofs on-chain.
                         </p>
 
                         <div className="flex justify-center md:flex-row flex-col gap-4">
@@ -82,6 +82,26 @@ export default function LandingPage() {
                                     Start Saving <ArrowRight className="w-4 h-4" />
                                 </Button>
                             </Link>
+                        </div>
+                    </motion.div>
+
+                    {/* Supported Chains */}
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ duration: 1, delay: 0.5 }}
+                        className="mt-20 pt-10 border-t border-white/5 flex flex-col items-center justify-center space-y-6"
+                    >
+                        <p className="text-sm font-bold tracking-widest text-gray-500 uppercase">Supported Networks</p>
+                        <div className="flex items-center gap-12 md:gap-20 opacity-70  transition-all duration-500">
+                            <div className="flex items-center gap-3 group">
+                                <Image src="/flare.png" alt="Flare Network" width={32} height={32} className="object-contain group-hover:scale-110 transition-transform" />
+                                <span className="text-xl font-bold font-display text-white hidden md:block">Flare</span>
+                            </div>
+                            <div className="flex items-center gap-3 group">
+                                <Image src="/solanas.png" alt="Solana Network" width={32} height={32} className="object-contain group-hover:scale-110 transition-transform" />
+                                <span className="text-xl font-bold font-display text-white hidden md:block">Solana</span>
+                            </div>
                         </div>
                     </motion.div>
                 </div>
@@ -98,15 +118,15 @@ export default function LandingPage() {
                         className="relative"
                     >
                         <div className="hidden md:block">
- <InteractiveMockDashboard />
+                            <InteractiveMockDashboard />
                         </div>
-                       
+
 
                         {/* Floating Labels / Steps */}
                         <div className="grid md:grid-cols-3 gap-6 mt-16 bg-zinc-900/40 p-4 md:p-10 rounded-[2.5rem] border border-white/5 md:w-[95%] mx-auto backdrop-blur-xl shadow-2xl relative">
-                            <motion.div 
-                                whileHover={{ 
-                                    backgroundColor: "rgba(230, 32, 88, 0.05)", 
+                            <motion.div
+                                whileHover={{
+                                    backgroundColor: "rgba(230, 32, 88, 0.05)",
                                     borderColor: "rgba(230, 32, 88, 0.4)",
                                     boxShadow: "0 10px 30px -10px rgba(230, 32, 88, 0.1)"
                                 }}
@@ -118,9 +138,9 @@ export default function LandingPage() {
                                 <p className="text-gray-400 text-sm leading-relaxed group-hover:text-gray-300 transition-colors">Select a savings category and set your maturity date.</p>
                             </motion.div>
 
-                            <motion.div 
-                                whileHover={{ 
-                                    backgroundColor: "rgba(230, 32, 88, 0.05)", 
+                            <motion.div
+                                whileHover={{
+                                    backgroundColor: "rgba(230, 32, 88, 0.05)",
                                     borderColor: "rgba(230, 32, 88, 0.4)",
                                     boxShadow: "0 10px 30px -10px rgba(230, 32, 88, 0.1)"
                                 }}
@@ -129,12 +149,12 @@ export default function LandingPage() {
                                 <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-primary to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                                 <div className="text-primary font-bold text-sm uppercase tracking-widest opacity-70 group-hover:opacity-100 transition-opacity">Step 02</div>
                                 <h4 className="text-lg font-bold text-white">Lock & Commitment</h4>
-                                <p className="text-gray-400 text-sm leading-relaxed group-hover:text-gray-300 transition-colors">Deploy funds into your non-custodial vault on Flare.</p>
+                                <p className="text-gray-400 text-sm leading-relaxed group-hover:text-gray-300 transition-colors">Deploy funds into your non-custodial securely.</p>
                             </motion.div>
 
-                            <motion.div 
-                                whileHover={{ 
-                                    backgroundColor: "rgba(230, 32, 88, 0.05)", 
+                            <motion.div
+                                whileHover={{
+                                    backgroundColor: "rgba(230, 32, 88, 0.05)",
                                     borderColor: "rgba(230, 32, 88, 0.4)",
                                     boxShadow: "0 10px 30px -10px rgba(230, 32, 88, 0.1)"
                                 }}
@@ -223,7 +243,7 @@ export default function LandingPage() {
             {/* Footer */}
             <footer className="border-t border-white/5 py-12 mt-16">
                 <div className="container mx-auto px-6 flex justify-center items-center text-gray-500 text-sm">
-                    <p>© {new Date().getFullYear()} Savique. Built on Flare.</p>
+                    <p>© {new Date().getFullYear()} Savique.</p>
                 </div>
             </footer>
         </div>

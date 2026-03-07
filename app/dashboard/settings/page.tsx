@@ -4,14 +4,14 @@ import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useAccount } from "wagmi";
 import { Mail, Shield, Bell, CheckCircle2, Loader2, Wallet } from "lucide-react";
 import { getUserProfile, updateUserProfile, UserProfile } from "@/lib/userService";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
+import { useEcosystemAccount } from "@/hooks/useEcosystemAccount";
 
 export default function SettingsPage() {
-    const { address, isConnected } = useAccount();
+    const { address, isConnected } = useEcosystemAccount();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [email, setEmail] = useState("");
@@ -214,12 +214,12 @@ function PreferenceToggle({ label, description, enabled, onChange }: { label: st
             </div>
             <div className="flex justify-end">
                 <button
-                type="button"
-                onClick={() => onChange(!enabled)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${enabled ? 'bg-primary' : 'bg-zinc-700'}`}
-            >
-                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${enabled ? 'translate-x-6' : 'translate-x-1'}`} />
-            </button>
+                    type="button"
+                    onClick={() => onChange(!enabled)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${enabled ? 'bg-primary' : 'bg-zinc-700'}`}
+                >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${enabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                </button>
             </div>
         </div>
     );

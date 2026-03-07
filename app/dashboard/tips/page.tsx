@@ -100,7 +100,33 @@ const FLARE_OPPORTUNITIES = [
     }
 ];
 
+import { useEcosystem } from "@/context/EcosystemContext";
+
 export default function SavingsTipsPage() {
+    const { isSolana } = useEcosystem();
+
+    if (isSolana) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-6 animate-in fade-in zoom-in duration-700">
+                <div className="w-24 h-24 rounded-[2.5rem] bg-primary/10 flex items-center justify-center relative group">
+                    <div className="absolute inset-0 bg-primary/20 blur-2xl rounded-full group-hover:blur-3xl transition-all duration-500 opacity-50" />
+                    <Zap className="w-10 h-10 text-primary animate-pulse relative z-10" />
+                </div>
+                <div className="text-center space-y-3">
+                    <h1 className="text-4xl font-black text-white tracking-tight">Solana Alpha Coming Soon</h1>
+                    <p className="text-zinc-500 max-w-sm mx-auto leading-relaxed text-lg">
+                        We're tailoring exclusive Solana earning opportunities and savings strategies for the SHIP ecosystem.
+                    </p>
+                </div>
+                <div className="flex gap-3">
+                    <div className="px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
+                        Phase 2: DeFi Integration
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="space-y-16 max-w-5xl mx-auto pb-20 relative">
             {/* Background Decor */}

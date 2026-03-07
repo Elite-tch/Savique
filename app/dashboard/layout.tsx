@@ -8,9 +8,13 @@ import { usePathname } from "next/navigation";
 import { Shield, LayoutDashboard, PlusCircle, History, LogOut, Wallet, User, Lock, Menu, X, BarChart3, Lightbulb, Settings } from "lucide-react";
 import { useDisconnect, useAccount } from "wagmi";
 import { ConnectButton } from '@rainbow-me/rainbowkit';
-
+import { useWallet } from '@solana/wallet-adapter-react';
+import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { Button } from "@/components/ui/button";
 import { NotificationBell } from "@/components/NotificationBell";
+import { useEcosystemAccount } from "@/hooks/useEcosystemAccount";
+import { EcosystemModal } from "@/components/EcosystemModal";
+import { useEcosystem } from "@/context/EcosystemContext";
 import { getUserVaultsFromDb } from "@/lib/receiptService";
 import { createNotification } from "@/lib/notificationService";
 import { usePublicClient } from "wagmi";
@@ -206,21 +210,45 @@ function SidebarContent({ pathname, onNavigate }: { pathname: string; onNavigate
 }
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-    const { address: walletAddress, isConnected } = useAccount();
-    const { disconnect } = useDisconnect();
+    const { address, isConnected } = useEcosystemAccount();
+    const { address: walletAddress, isConnected: isFlareConnected } = useAccount();
+    const { connected: isSolanaConnected, disconnect: disconnectSolana, publicKey } = useWallet();
+    const { setVisible: setSolanaModalVisible } = useWalletModal();
+    const { disconnect: disconnectFlare } = useDisconnect();
+    const { ecosystem, clearEcosystem, isFlare, isSolana } = useEcosystem();
+
     const pathname = usePathname();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const [isEcosystemModalOpen, setIsEcosystemModalOpen] = useState(false);
+    const [isSolanaAccountMenuOpen, setIsSolanaAccountMenuOpen] = useState(false);
 
-    useDeadlinePulse(walletAddress);
+    useDeadlinePulse(address);
 
     const handleLogout = () => {
-        disconnect();
+        if (isFlareConnected) disconnectFlare();
+        if (isSolanaConnected) disconnectSolana();
+        clearEcosystem();
     };
 
-    const shortAddress = walletAddress ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : "";
+    const solanaAddress = publicKey?.toBase58();
+
+    const shortAddress = isFlareConnected
+        ? (walletAddress ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : "")
+        : (isSolanaConnected && solanaAddress ? `${solanaAddress.slice(0, 4)}...${solanaAddress.slice(-4)}` : "");
 
     return (
         <div className="min-h-screen flex bg-black text-white selection:bg-primary/30">
+            {/* Ecosystem Selection Modal */}
+            <EcosystemModal
+                isOpen={isEcosystemModalOpen}
+                onClose={() => setIsEcosystemModalOpen(false)}
+                onSelectFlare={() => {
+                    // This will be handled by the ConnectButton.Custom wrapper in the header
+                }}
+                onSelectSolana={() => {
+                    setSolanaModalVisible(true);
+                }}
+            />
             {/* Desktop Sidebar */}
             <aside className="hidden md:flex w-64 border-r border-white/10 flex flex-col fixed h-full glass z-20">
                 <SidebarContent pathname={pathname} />
@@ -270,21 +298,78 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     <div className="flex items-center gap-4">
                         {isConnected ? (
                             <div className="flex items-center md:gap-4">
-
                                 <NotificationBell />
-                                <ReceiptSync />
+                                {isFlareConnected && <ReceiptSync />}
                                 <div className="hidden md:block">
-                                    <ConnectButton
-                                        accountStatus="address"
-                                        showBalance={false}
-                                        chainStatus="icon"
-                                    />
+                                    {isFlareConnected ? (
+                                        <ConnectButton
+                                            accountStatus="address"
+                                            showBalance={false}
+                                            chainStatus="icon"
+                                        />
+                                    ) : (
+                                        <div className="relative">
+                                            <Button
+                                                variant="outline"
+                                                className="rounded-full border-white/10 bg-white/5 hover:bg-white/10 text-white"
+                                                onClick={() => setIsSolanaAccountMenuOpen(!isSolanaAccountMenuOpen)}
+                                            >
+                                                <div className="w-2 h-2 rounded-full bg-cyan-400 mr-2 animate-pulse" />
+                                                {shortAddress || "Solana Connected"}
+                                            </Button>
+
+                                            {/* Solana Account Dropdown */}
+                                            <AnimatePresence>
+                                                {isSolanaAccountMenuOpen && (
+                                                    <>
+                                                        <div className="fixed inset-0 z-40" onClick={() => setIsSolanaAccountMenuOpen(false)} />
+                                                        <motion.div
+                                                            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                                                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                                                            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                                                            className="absolute right-0 mt-2 w-48 rounded-2xl border border-white/10 bg-zinc-900 shadow-2xl z-50 p-2 backdrop-blur-xl"
+                                                        >
+                                                            <div className="p-3 border-b border-white/5 mb-1">
+                                                                <p className="text-[10px] uppercase tracking-widest text-gray-500 font-bold px-1">Solana Wallet</p>
+                                                                <p className="text-sm font-mono text-gray-300 truncate px-1">{solanaAddress}</p>
+                                                            </div>
+                                                            <button
+                                                                onClick={() => {
+                                                                    setSolanaModalVisible(true);
+                                                                    setIsSolanaAccountMenuOpen(false);
+                                                                }}
+                                                                className="w-full text-left px-4 py-2 text-sm text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-colors flex items-center gap-2"
+                                                            >
+                                                                <Wallet className="w-4 h-4" /> Change Wallet
+                                                            </button>
+                                                            <button
+                                                                onClick={() => {
+                                                                    handleLogout();
+                                                                    setIsSolanaAccountMenuOpen(false);
+                                                                }}
+                                                                className="w-full text-left px-4 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-red-400/10 rounded-xl transition-colors flex items-center gap-2"
+                                                            >
+                                                                <LogOut className="w-4 h-4" /> Disconnect
+                                                            </button>
+                                                        </motion.div>
+                                                    </>
+                                                )}
+                                            </AnimatePresence>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         ) : (
                             <ConnectButton.Custom>
                                 {({ openConnectModal }) => (
-                                    <Button onClick={openConnectModal} className="gap-2 md:py-3 py-2 bg-primary hover:bg-primary/90 text-white rounded-full">
+                                    <Button
+                                        onClick={() => {
+                                            // Provide the connect function to the window so the modal can call it
+                                            (window as any).openFlareConnect = openConnectModal;
+                                            setIsEcosystemModalOpen(true);
+                                        }}
+                                        className="gap-2 md:py-3 py-2 bg-primary hover:bg-primary/90 text-white rounded-full"
+                                    >
                                         <Wallet className="w-4 hidden sm:inline h-4" /> <span className="">Connect Wallet</span>
                                     </Button>
                                 )}

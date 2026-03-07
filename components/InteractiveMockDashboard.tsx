@@ -16,7 +16,7 @@ export function InteractiveMockDashboard() {
                         <p className="text-sm text-gray-500">Real-time status of your Savique protocol assets.</p>
                     </div>
                     <div className="bg-primary/20 text-primary px-4 py-2 rounded-full text-xs font-bold border border-primary/20 hidden md:block">
-                        Active Node: Flare Coston2
+                        Active Node: Multichain
                     </div>
                 </div>
 

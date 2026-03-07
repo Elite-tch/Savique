@@ -17,12 +17,34 @@ import {
     X
 } from "lucide-react";
 import Link from "next/link";
+import { AdminEcosystemProvider, useAdminEcosystem, AdminEcosystem } from "./AdminEcosystemContext";
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
-    const [loading, setLoading] = useState(true);
+function EcosystemToggle() {
+    const { ecosystem, setEcosystem } = useAdminEcosystem();
+
+    return (
+        <div className="flex items-center gap-1 p-1 bg-white/5 border border-white/10 rounded-xl h-10">
+            {(['all', 'flare', 'solana'] as const).map((e) => (
+                <button
+                    key={e}
+                    onClick={() => setEcosystem(e)}
+                    className={`px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all ${ecosystem === e
+                        ? 'bg-red-600 text-white shadow-lg shadow-red-600/20'
+                        : 'text-gray-500 hover:text-gray-300'
+                        }`}
+                >
+                    {e === 'all' ? 'All Hubs' : e}
+                </button>
+            ))}
+        </div>
+    );
+}
+
+function AdminLayoutContent({ children }: { children: React.ReactNode }) {
     const [authorized, setAuthorized] = useState(false);
     const router = useRouter();
     const pathname = usePathname();
+    const [sidebarOpen, setSidebarOpen] = useState(false);
 
     useEffect(() => {
         const unsubscribe = subscribeToAuth((user) => {
@@ -37,21 +59,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     router.push("/admin/login");
                 }
             }
-            setLoading(false);
         });
 
         return () => unsubscribe();
     }, [pathname, router]);
-
-    const [sidebarOpen, setSidebarOpen] = useState(false);
-
-    if (loading) {
-        return (
-            <div className="min-h-screen bg-black flex items-center justify-center">
-                <Loader2 className="w-8 h-8 text-red-600 animate-spin" />
-            </div>
-        );
-    }
 
     const isLoginPage = pathname === "/admin/login";
 
@@ -67,14 +78,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     <div className="relative w-8 h-8 rounded-lg overflow-hidden">
                         <Image src="/logo3.png" alt="Logo" fill className="object-contain" />
                     </div>
-                    <span className="font-bold text-lg">Savique</span>
                 </div>
-                <button
-                    onClick={() => setSidebarOpen(!sidebarOpen)}
-                    className="p-2 text-gray-400 hover:text-white transition-colors"
-                >
-                    {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
-                </button>
+                <div className="flex items-center gap-4">
+                    <EcosystemToggle />
+                    <button
+                        onClick={() => setSidebarOpen(!sidebarOpen)}
+                        className="p-2 text-gray-400 hover:text-white transition-colors"
+                    >
+                        {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
+                    </button>
+                </div>
             </header>
 
             {/* Backdrop for mobile */}
@@ -161,11 +174,48 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 </div>
             </aside>
 
-            {/* Main Content */}
-            <main className="flex-1 lg:ml-64 p-4 md:p-8 pt-20 lg:pt-8 transition-all">
-                {children}
-            </main>
+            {/* Main Content Area */}
+            <div className="flex-1 lg:ml-64 flex flex-col min-h-screen">
+                {/* Desktop Top Bar */}
+                <header className="hidden lg:flex h-16 fixed top-0 left-64 right-0 bg-black/20 backdrop-blur-md border-b border-white/5 items-center justify-between px-8 z-30">
+                    <div className="flex items-center gap-2 text-zinc-500">
+                        <Shield className="w-4 h-4" />
+                        <span className="text-[10px] font-bold uppercase tracking-[0.2em]">Administrative Terminal</span>
+                    </div>
+                    <EcosystemToggle />
+                </header>
+
+                <main className="flex-1 p-4 md:p-8 pt-24 lg:pt-24 transition-all overflow-y-auto">
+                    {children}
+                </main>
+            </div>
         </div>
+    );
+}
+
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
+    const [loading, setLoading] = useState(true);
+    const pathname = usePathname();
+
+    useEffect(() => {
+        const unsubscribe = subscribeToAuth(() => {
+            setLoading(false);
+        });
+        return () => unsubscribe();
+    }, []);
+
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-black flex items-center justify-center">
+                <Loader2 className="w-8 h-8 text-red-600 animate-spin" />
+            </div>
+        );
+    }
+
+    return (
+        <AdminEcosystemProvider>
+            <AdminLayoutContent children={children} />
+        </AdminEcosystemProvider>
     );
 }
 

@@ -15,6 +15,12 @@ import { useProofRails } from "@proofrails/sdk/react";
 import { saveReceipt, saveVault } from "@/lib/receiptService";
 import { createNotification } from "@/lib/notificationService";
 import { getUserProfile } from "@/lib/userService";
+import { useEcosystemAccount } from "@/hooks/useEcosystemAccount";
+import { useEcosystem } from "@/context/EcosystemContext";
+import { useConnection, useWallet, useAnchorWallet } from "@solana/wallet-adapter-react";
+import * as anchor from "@coral-xyz/anchor";
+import { PublicKey as SolanaPubkey } from "@solana/web3.js";
+import { DEVNET_SHIP_MINT, DEVNET_USDC_MINT, SAVIQUE_PROGRAM_ID } from "@/lib/solana";
 
 const MAX_UINT256 = BigInt("115792089237316195423570985008687907853269984665640564039457584007913129639935");
 
@@ -74,7 +80,11 @@ function CustomSelect({ value, onChange, options, label }: { value: string, onCh
 
 export default function CreatePersonalVault() {
     const router = useRouter();
-    const { address, isConnected, isConnecting, isReconnecting } = useAccount();
+    const { address, isConnected } = useEcosystemAccount();
+    const { isFlare, isSolana } = useEcosystem();
+    const { connection } = useConnection();
+    const { publicKey, sendTransaction } = useWallet();
+    const anchorWallet = useAnchorWallet();
     const publicClient = usePublicClient();
 
     // USDT Balance
@@ -83,7 +93,7 @@ export default function CreatePersonalVault() {
         abi: ERC20_ABI,
         functionName: 'balanceOf',
         args: [address as `0x${string}`],
-        query: { enabled: !!address },
+        query: { enabled: !!address && isFlare },
     });
 
     const { data: decimals } = useReadContract({
@@ -98,7 +108,7 @@ export default function CreatePersonalVault() {
         abi: ERC20_ABI,
         functionName: 'allowance',
         args: [address as `0x${string}`, CONTRACTS.coston2.VaultFactory],
-        query: { enabled: !!address },
+        query: { enabled: !!address && isFlare },
     });
 
     const [formData, setFormData] = useState({
@@ -108,6 +118,7 @@ export default function CreatePersonalVault() {
         duration: "30",
         durationUnit: "days" as "minutes" | "hours" | "days",
         beneficiary: "",
+        token: "SHIP" as "SHIP" | "USDC"
     });
 
     const [customDuration, setCustomDuration] = useState("");
@@ -119,6 +130,26 @@ export default function CreatePersonalVault() {
     const [currentStep, setCurrentStep] = useState<Step>('idle');
     const [createdVaultAddress, setCreatedVaultAddress] = useState<`0x${string}` | null>(null);
     const [txHash, setTxHash] = useState<`0x${string}` | undefined>(undefined);
+
+    const [solanaBalance, setSolanaBalance] = useState<string | null>(null);
+    useEffect(() => {
+        async function fetchBal() {
+            if (isSolana && publicKey && connection) {
+                try {
+                    const { getAssociatedTokenAddressSync } = await import("@solana/spl-token");
+                    const mint = formData.token === 'USDC' ? DEVNET_USDC_MINT : DEVNET_SHIP_MINT;
+                    const ata = getAssociatedTokenAddressSync(mint, publicKey);
+                    const bal = await connection.getTokenAccountBalance(ata);
+                    setSolanaBalance(bal.value.uiAmountString || "0");
+                } catch (e) {
+                    setSolanaBalance("0");
+                }
+            } else {
+                setSolanaBalance(null);
+            }
+        }
+        fetchBal();
+    }, [isSolana, publicKey, connection, formData.token]);
 
     // Brand Styled Toast
     const toastStyle = {
@@ -177,7 +208,7 @@ export default function CreatePersonalVault() {
                                 address: CONTRACTS.coston2.VaultFactory,
                                 abi: VAULT_FACTORY_ABI,
                                 functionName: 'getUserVaults',
-                                args: [address!]
+                                args: [address as `0x${string}`]
                             });
                             newVault = userVaults[userVaults.length - 1];
                         }
@@ -306,22 +337,27 @@ export default function CreatePersonalVault() {
     const handleCreate = async () => {
         if (!address) return;
         try {
-            const amountUnits = parseUnits(formData.amount, decimals || 18);
-            if (!allowance || allowance < amountUnits) {
-                setCurrentStep('approving');
-                toastId.current = toast.loading("Approving USDT...", toastStyle);
-                writeContract({
-                    address: CONTRACTS.coston2.USDTToken,
-                    abi: ERC20_ABI,
-                    functionName: "approve",
-                    args: [CONTRACTS.coston2.VaultFactory, MAX_UINT256]
-                }, {
-                    onSuccess: (hash) => setTxHash(hash)
-                });
+            const amountUnits = isFlare ? parseUnits(formData.amount, decimals || 18) : BigInt(0);
+            if (isFlare) {
+                if (!allowance || allowance < amountUnits) {
+                    setCurrentStep('approving');
+                    toastId.current = toast.loading("Approving USDT...", toastStyle);
+                    writeContract({
+                        address: CONTRACTS.coston2.USDTToken,
+                        abi: ERC20_ABI,
+                        functionName: "approve",
+                        args: [CONTRACTS.coston2.VaultFactory, MAX_UINT256]
+                    }, {
+                        onSuccess: (hash) => setTxHash(hash)
+                    });
+                } else {
+                    setCurrentStep('creating');
+                    toastId.current = toast.loading("Creating & Funding Savings...", toastStyle);
+                    triggerCreateVault();
+                }
             } else {
-                setCurrentStep('creating');
-                toastId.current = toast.loading("Creating & Funding Savings...", toastStyle);
-                triggerCreateVault();
+                // Solana Creation Flow
+                handleSolanaCreate();
             }
         } catch (e) {
             console.error(e);
@@ -339,7 +375,7 @@ export default function CreatePersonalVault() {
                 factoryAddress: CONTRACTS.coston2.VaultFactory,
                 createdAt: Date.now(),
                 purpose: formData.purpose,
-                targetAmount: formData.targetAmount || formData.amount,
+                targetAmount: formData.targetAmount,
                 beneficiary: formData.beneficiary || ""
             });
         } catch (dbError) {
@@ -394,7 +430,7 @@ export default function CreatePersonalVault() {
                             txHash: txHashStr,
                             unlockDate: unlockDateStr,
                             proofRailsId: receiptResult.id,
-                            targetAmount: formData.targetAmount || formData.amount
+                            targetAmount: formData.targetAmount
                         })
                     });
                     const result = await response.json();
@@ -457,7 +493,7 @@ export default function CreatePersonalVault() {
                             amount: formData.amount,
                             txHash: txHashStr,
                             unlockDate: unlockDateStr,
-                            targetAmount: formData.targetAmount || formData.amount
+                            targetAmount: formData.targetAmount
                         })
                     });
                     const result = await response.json();
@@ -525,7 +561,168 @@ export default function CreatePersonalVault() {
         if (currentStep === 'approving') return "Approving USDT0...";
         if (currentStep === 'generating_proof') return "Finalizing Receipt...";
         if (currentStep === 'done') return "Redirecting...";
-        return "Create & Lock Funds";
+        return isSolana ? `Create ${formData.token} Savings` : "Create & Lock Funds";
+    };
+
+    const handleSolanaCreate = async () => {
+        if (!publicKey || !connection || !anchorWallet) {
+            toast.error("Wallet not connected", toastStyle);
+            return;
+        }
+        setCurrentStep('creating');
+        toastId.current = toast.loading("Creating Solana Vault...", toastStyle);
+
+        try {
+            const { getSigningProvider, getSaviqueProgram } = await import("@/lib/anchor");
+            const { BN } = await import("@coral-xyz/anchor");
+
+            const provider = getSigningProvider(connection, anchorWallet);
+            const program = getSaviqueProgram(provider);
+
+            // Calculate unlock timestamp from form
+            const val = customDuration ? parseInt(customDuration) : parseInt(formData.duration);
+            const unit = formData.durationUnit;
+            let seconds = 0;
+            if (unit === 'minutes') seconds = val * 60;
+            else if (unit === 'hours') seconds = val * 60 * 60;
+            else seconds = val * 24 * 60 * 60;
+            const unlockTimestamp = Math.floor(Date.now() / 1000) + seconds;
+
+            // Determine Decimals & Mint
+            const isUsdc = formData.token === 'USDC';
+            const decimals = isUsdc ? 6 : 9;
+            const mint = isUsdc ? DEVNET_USDC_MINT : DEVNET_SHIP_MINT;
+            const rawAmount = Math.round(parseFloat(formData.amount) * 10 ** decimals);
+
+            // Optional beneficiary
+            let beneficiaryPubkey: SolanaPubkey | null = null;
+            if (formData.beneficiary?.trim()) {
+                try { beneficiaryPubkey = new SolanaPubkey(formData.beneficiary.trim()); } catch { }
+            }
+
+            // Build & send transaction via Anchor
+            const tx = await (program.methods as any)
+                .createVault(
+                    formData.purpose,
+                    new BN(unlockTimestamp),
+                    new BN(rawAmount),
+                    beneficiaryPubkey
+                )
+                .accounts({
+                    owner: publicKey,
+                    mint: mint,
+                })
+                .transaction();
+
+            const latestBlockhash = await connection.getLatestBlockhash('confirmed');
+            tx.recentBlockhash = latestBlockhash.blockhash;
+            tx.feePayer = publicKey;
+
+            const signature = await sendTransaction(tx, connection, { skipPreflight: false });
+            toast.dismiss(toastId.current as string);
+            toastId.current = toast.loading("Confirming on-chain...", toastStyle);
+
+            await connection.confirmTransaction({
+                signature,
+                ...latestBlockhash
+            });
+
+            // Derive vault PDA for DB storage - MUST MATCH PROGRAM SEEDS
+            const [vaultPDA] = SolanaPubkey.findProgramAddressSync(
+                [
+                    Buffer.from("vault"),
+                    publicKey.toBuffer(),
+                    Buffer.from(formData.purpose)
+                ],
+                SAVIQUE_PROGRAM_ID
+            );
+
+            await saveVault({
+                vaultAddress: vaultPDA.toBase58(),
+                owner: publicKey.toBase58(),
+                factoryAddress: SAVIQUE_PROGRAM_ID.toBase58(),
+                createdAt: Date.now(),
+                purpose: formData.purpose,
+                targetAmount: formData.targetAmount,
+                beneficiary: formData.beneficiary || "",
+                currency: formData.token,
+                decimals: decimals
+            });
+
+            // Add to transaction history
+            await saveReceipt({
+                walletAddress: publicKey.toBase58(),
+                vaultAddress: vaultPDA.toBase58(),
+                txHash: signature,
+                timestamp: Date.now(),
+                purpose: formData.purpose,
+                amount: formData.amount,
+                verified: false, // ProofRails pending
+                type: 'created',
+                currency: formData.token,
+                decimals: decimals
+            });
+
+            await createNotification(
+                publicKey.toBase58(),
+                "Solana Savings Created! 🚀",
+                `Your ${formData.token} savings "${formData.purpose}" is now locked on Solana Devnet.`,
+                'success',
+                `/dashboard/savings/${vaultPDA.toBase58()}`
+            );
+
+            // Send Confirmation Email
+            try {
+                const profile = await getUserProfile(publicKey.toBase58());
+                if (profile?.email && (!profile.notificationPreferences || profile.notificationPreferences.deposits)) {
+                    await fetch('/api/notify', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            type: 'DEPOSIT_CONFIRMED',
+                            userEmail: profile.email,
+                            purpose: formData.purpose,
+                            amount: formData.amount,
+                            txHash: signature,
+                            unlockDate: new Date(unlockTimestamp * 1000).toLocaleDateString(),
+                            targetAmount: formData.targetAmount,
+                            currency: formData.token
+                        })
+                    });
+                }
+            } catch (emailErr) {
+                console.warn('[Email] Failed to send Solana creation notification:', emailErr);
+            }
+
+            toast.dismiss(toastId.current as string);
+            toast.success("Savings Created on Solana! 🚀", toastStyle);
+            setCurrentStep('done');
+            setTimeout(() => router.push("/dashboard/savings"), 1500);
+        } catch (e: any) {
+            console.error("Solana create vault error:", e);
+            if (toastId.current) toast.dismiss(toastId.current as string);
+            toast.error(`Failed: ${e?.message?.split('\n')[0] || 'Unknown error'}`, toastStyle);
+            setCurrentStep('idle');
+
+            // Send Failure Email
+            try {
+                const profile = await getUserProfile(publicKey.toBase58());
+                if (profile?.email) {
+                    await fetch('/api/notify', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            type: 'TRANSACTION_FAILED',
+                            userEmail: profile.email,
+                            purpose: formData.purpose,
+                            amount: formData.amount
+                        })
+                    });
+                }
+            } catch (emailErr) {
+                console.warn('[Email] Failed to send Solana create failure notification:', emailErr);
+            }
+        }
     };
 
     if (!isConnected) {
@@ -547,8 +744,32 @@ export default function CreatePersonalVault() {
                     <Card className="md:p-8">
                         <div className="mb-8">
                             <h2 className="text-3xl font-bold text-white mb-2">Commit Your Savings</h2>
-                            <p className="text-gray-400">Lock your USDT0 to reach your goals and earn a success bonus upon completion.</p>
+                            <p className="text-gray-400">Lock your {isSolana ? formData.token : 'USDT0'} to reach your goals and earn a success bonus upon completion.</p>
                         </div>
+
+                        {isSolana && (
+                            <div className="mb-8 p-6 bg-zinc-900/60 rounded-2xl border border-white/5 space-y-4">
+                                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest block text-left">Select Savings Currency</label>
+                                <div className="flex justify-end gap-3">
+                                    {(['SHIP', 'USDC'] as const).map((t) => (
+                                        <button
+                                            key={t} type="button"
+                                            onClick={() => setFormData({ ...formData, token: t })}
+                                            className={`px-6 py-2 rounded-lg text-sm border transition-all flex items-center justify-center gap-2.5 ${formData.token === t ? 'bg-primary/10 border-primary text-white' : 'border-white/5 text-gray-400 hover:border-white/10'}`}
+                                        >
+                                            <div className="w-5 h-5 rounded-full overflow-hidden shrink-0 border border-white/5 bg-zinc-800">
+                                                <img
+                                                    src={t === 'SHIP' ? '/ship.png' : '/usdc.png'}
+                                                    alt={t}
+                                                    className="w-full h-full object-cover"
+                                                />
+                                            </div>
+                                            <span className="font-bold">{t}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
                         <form onSubmit={handleSubmit} className="space-y-6">
                             <div className="space-y-2">
@@ -603,10 +824,13 @@ export default function CreatePersonalVault() {
                                             value={formData.amount}
                                             onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
                                         />
-                                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">USDT0</span>
+                                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">{isSolana ? formData.token : 'USDT0'}</span>
                                     </div>
-                                    {balance !== undefined && (
-                                        <p className="text-xs text-gray-500 mt-1">Available: {formatUnits(balance, decimals || 18)} USDT0</p>
+                                    {!isSolana && balance !== undefined && (
+                                        <p className="text-xs text-gray-500 mt-1">Available: {formatUnits(balance as bigint, 6)} USDT0</p>
+                                    )}
+                                    {isSolana && solanaBalance !== null && (
+                                        <p className="text-xs text-gray-500 mt-1">Available: {parseFloat(solanaBalance).toLocaleString()} {formData.token}</p>
                                     )}
                                 </div>
 
@@ -623,7 +847,7 @@ export default function CreatePersonalVault() {
                                             value={formData.targetAmount}
                                             onChange={(e) => setFormData({ ...formData, targetAmount: e.target.value })}
                                         />
-                                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">USDT0</span>
+                                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">{isSolana ? formData.token : 'USDT0'}</span>
                                     </div>
                                 </div>
                             </div>
@@ -708,14 +932,26 @@ export default function CreatePersonalVault() {
                             </div>
 
                             {isProcessing && (
-                                <div className="p-4 bg-primary/10 rounded-xl border border-primary/20 space-y-2">
-                                    <div className="flex items-center gap-2">
-                                        {currentStep === 'approving' ? <Loader2 className="w-4 h-4 animate-spin text-primary" /> : <Check className="w-4 h-4 text-green-500" />}
-                                        <span className={`text-sm ${currentStep === 'approving' ? 'text-primary font-bold' : 'text-gray-400'}`}>1. Approve USDT0</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        {currentStep === 'creating' ? <Loader2 className="w-4 h-4 animate-spin text-primary" /> : ((currentStep === 'generating_proof') ? <Check className="w-4 h-4 text-green-500" /> : <div className="w-4 h-4 rounded-full border border-gray-500" />)}
-                                        <span className={`text-sm ${currentStep === 'creating' ? 'text-primary font-bold' : 'text-gray-400'}`}>2. Create & Deposit</span>
+                                <div className="mt-8 bg-[#E62058]/5 border border-[#E62058]/20 rounded-xl p-6">
+                                    <div className="flex flex-col gap-4">
+                                        {!isSolana && (
+                                            <div className="flex items-center gap-3">
+                                                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs border ${currentStep === 'approving' ? 'border-[#E62058] text-[#E62058] animate-pulse' : (allowance && parseFloat(formatUnits(allowance as bigint, Number(decimals || 18))) >= (parseFloat(formData.amount) || 0)) ? 'bg-transparent border-[#E62058] text-[#E62058]' : 'border-zinc-700 text-zinc-500'}`}>
+                                                    {(allowance && parseFloat(formatUnits(allowance as bigint, Number(decimals || 18))) >= (parseFloat(formData.amount) || 0)) ? '✓' : '1'}
+                                                </div>
+                                                <span className={`text-sm ${(allowance && parseFloat(formatUnits(allowance as bigint, Number(decimals || 18))) >= (parseFloat(formData.amount) || 0)) ? 'text-[#E62058]' : 'text-zinc-400'}`}>
+                                                    1. Approve {isSolana ? 'SHIP' : 'USDT0'}
+                                                </span>
+                                            </div>
+                                        )}
+                                        <div className="flex items-center gap-3">
+                                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs border ${currentStep === 'creating' || currentStep === 'generating_proof' ? 'border-[#E62058] text-[#E62058] animate-pulse' : 'border-zinc-700 text-zinc-500'}`}>
+                                                {isSolana ? '1' : '2'}
+                                            </div>
+                                            <span className="text-sm text-zinc-400">
+                                                {isSolana ? `1. Create & Deposit ${formData.token}` : '2. Create & Deposit USDT0'}
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
                             )}
@@ -740,12 +976,12 @@ export default function CreatePersonalVault() {
                         <div className="space-y-4">
                             <div>
                                 <p className="text-xs text-gray-500 mb-1">Locking Amount</p>
-                                <p className="text-2xl font-bold text-white">{formData.amount || "0"} USDT0</p>
+                                <p className="text-2xl font-bold text-white">{formData.amount || "0"} {isFlare ? 'USDT0' : formData.token}</p>
                             </div>
                             <div className="h-px bg-white/10" />
                             <div>
                                 <p className="text-xs text-gray-500 mb-1">Early Exit Fee</p>
-                                <p className="text-sm font-medium text-red-500">{FIXED_PENALTY}% ({potentialPenalty} USDT0)</p>
+                                <p className="text-sm font-medium text-red-500">{FIXED_PENALTY}% ({potentialPenalty} {isFlare ? 'USDT0' : formData.token})</p>
                             </div>
                             <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
                                 <p className="text-xs text-red-400 flex gap-2">

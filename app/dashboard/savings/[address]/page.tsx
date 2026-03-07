@@ -16,8 +16,14 @@ import { useProofRails } from "@proofrails/sdk/react";
 import { saveReceipt, getVaultByAddress, SavedVault, updateReceipt, saveVault, getReceiptsByVault, Receipt } from "@/lib/receiptService";
 import { createNotification } from "@/lib/notificationService";
 import { getUserProfile } from "@/lib/userService";
+import { useConnection, useWallet, useAnchorWallet } from "@solana/wallet-adapter-react";
+import { PublicKey as SolanaPubkey } from "@solana/web3.js";
+import { DEVNET_SHIP_MINT, DEVNET_USDC_MINT, SAVIQUE_PROGRAM_ID } from "@/lib/solana";
 import { Progress } from "../../../../components/ui/progress";
 import { Loader2, Plus, ArrowUpCircle } from "lucide-react";
+import { useEcosystemAccount } from "@/hooks/useEcosystemAccount";
+import { useVaultData } from "@/hooks/useVaultData";
+import { useEcosystem } from "@/context/EcosystemContext";
 
 const MOTIVATION_QUOTES = [
     "Discipline is doing what needs to be done, even if you don't want to do it.",
@@ -63,12 +69,14 @@ export default function VaultDetailPage() {
     const params = useParams();
     const router = useRouter();
     const searchParams = useSearchParams();
-    const address = params?.address as `0x${string}`;
+    const address = params?.address as string;
     const returnTab = searchParams.get('tab') || 'active';
 
     const [quote, setQuote] = useState("");
     const [isBreakModalOpen, setIsBreakModalOpen] = useState(false);
-    const { address: userAddress, isConnected } = useAccount();
+    const isFlare = address?.startsWith('0x');
+    const isSolana = address && !isFlare;
+    const { address: userAddress, isConnected } = useEcosystemAccount();
 
 
 
@@ -88,6 +96,7 @@ export default function VaultDetailPage() {
     const [withdrawalReceipt, setWithdrawalReceipt] = useState<Receipt | null>(null);
 
     const [isApprovingVault, setIsApprovingVault] = useState(false);
+    const [isWithdrawProcessing, setIsWithdrawProcessing] = useState(false);
 
     useEffect(() => {
         const fetchVault = async () => {
@@ -106,46 +115,49 @@ export default function VaultDetailPage() {
         fetchVault();
     }, [address]);
 
-    // Contract interactions
-    const { data: purpose } = useReadContract({ address, abi: VAULT_ABI, functionName: "purpose" });
-    const { data: balanceResult, refetch: refetchBalance } = useReadContract({ address, abi: VAULT_ABI, functionName: "totalAssets" });
-    const { data: unlockTimeResult } = useReadContract({ address, abi: VAULT_ABI, functionName: "unlockTimestamp" });
-    const { data: decimals } = useReadContract({
-        address: CONTRACTS.coston2.USDTToken,
-        abi: ERC20_ABI,
-        functionName: 'decimals',
-    });
+    const { data: vaultChainData, loading: loadingChain } = useVaultData(address);
+    const { connection } = useConnection();
+    const { publicKey, sendTransaction } = useWallet();
+    const anchorWallet = useAnchorWallet();
 
-    const { data: beneficiary } = useReadContract({ address, abi: VAULT_ABI, functionName: "beneficiary" });
-
-
-    // Check Allowance for Top-up
+    // Flare-only contract reads
     const { data: allowance, refetch: refetchAllowance } = useReadContract({
         address: CONTRACTS.coston2.USDTToken,
         abi: ERC20_ABI,
         functionName: 'allowance',
-        args: [userAddress as `0x${string}`, address],
-        query: { enabled: !!userAddress && !!address },
+        args: [userAddress as `0x${string}`, address as `0x${string}`],
+        query: { enabled: !!userAddress && !!address && isFlare },
     });
 
-    // Balance for Top-up
     const { data: userBalance, refetch: refetchUserBalance } = useReadContract({
         address: CONTRACTS.coston2.USDTToken,
         abi: ERC20_ABI,
         functionName: 'balanceOf',
         args: [userAddress as `0x${string}`],
-        query: { enabled: !!userAddress },
+        query: { enabled: !!userAddress && isFlare },
     });
 
+    const { data: beneficiary } = useReadContract({
+        address: address as `0x${string}`,
+        abi: VAULT_ABI,
+        functionName: "beneficiary",
+        query: { enabled: !!address && isFlare }
+    });
+
+    const currency = vaultChainData?.currency || (isFlare ? 'USDT0' : 'SHIP');
+    const decimals = vaultChainData?.decimals || (isFlare ? 6 : (currency === 'USDC' ? 6 : 9));
+    const balance = vaultChainData?.balance ? formatUnits(BigInt(vaultChainData.balance), decimals) : "0";
+    const purpose = vaultChainData?.purpose || vaultData?.purpose || "Savings Plan";
+
     const accruedBonus = useMemo(() => {
-        if (!balanceResult || !vaultData || !decimals) return "0.000";
-        const bal = parseFloat(formatUnits(balanceResult, decimals as number || 18));
+        if (!vaultChainData?.balance || !vaultData || !isFlare) return "0.000";
+        const bal = parseFloat(formatUnits(BigInt(vaultChainData.balance), 6));
         const now = Date.now();
         const start = vaultData.createdAt;
         const elapsedYears = (now - start) / (1000 * 60 * 60 * 24 * 365);
         // Assuming 10% yield, user gets 10% share = 1% APY effective
         return (bal * 0.01 * elapsedYears).toFixed(4);
-    }, [balanceResult, vaultData, decimals]);
+    }, [vaultChainData?.balance, vaultData]);
 
     // Brand Styled Toast
     const toastStyle = {
@@ -237,8 +249,7 @@ export default function VaultDetailPage() {
         }
     }, [confirmError, userAddress, purpose, topUpAmount, withdrawingAmount, hash]);
 
-    const balance = balanceResult ? formatUnits(balanceResult as bigint, decimals as number || 18) : "0";
-    const unlockDate = unlockTimeResult ? new Date(Number(unlockTimeResult) * 1000) : new Date();
+    const unlockDate = vaultChainData?.unlockTimestamp ? new Date(vaultChainData.unlockTimestamp * 1000) : new Date();
     const isLocked = new Date() < unlockDate;
     const countdown = useCountdown(unlockDate);
 
@@ -314,7 +325,7 @@ export default function VaultDetailPage() {
                     : `Withdrawal: ${purpose}`;
 
                 try {
-                    console.log(`[${isDeposit ? 'Deposit' : 'Withdraw'}] Generating receipt for ${amountToSave} USDT0...`);
+                    console.log(`[${isDeposit ? 'Deposit' : 'Withdraw'}] Generating receipt for ${amountToSave} ${currency}...`);
 
                     // 1. Generate ProofRails Receipt
                     const receiptResult = await sdk.templates.payment({
@@ -335,7 +346,9 @@ export default function VaultDetailPage() {
                         amount: parseFloat(amountToSave).toFixed(2),
                         type: isDeposit ? 'created' : 'completed',
                         verified: !!receiptResult?.id,
-                        proofRailsId: receiptResult?.id
+                        proofRailsId: receiptResult?.id,
+                        currency: currency,
+                        decimals: decimals
                     });
 
                     // 3. Notify User
@@ -390,8 +403,9 @@ export default function VaultDetailPage() {
                     toast.success("Receipt Generated", toastStyle);
 
                     // Refetch all data to update UI immediately
-                    refetchBalance();
-                    refetchUserBalance();
+                    if (isFlare) {
+                        refetchUserBalance();
+                    }
 
                     if (isDeposit) {
                         setTopUpStep('done');
@@ -419,7 +433,9 @@ export default function VaultDetailPage() {
                         purpose: customPurpose,
                         amount: parseFloat(amountToSave).toFixed(2),
                         type: isDeposit ? 'created' : 'completed',
-                        verified: false
+                        verified: false,
+                        currency: currency,
+                        decimals: decimals
                     });
 
                     // Notify fallback
@@ -447,7 +463,8 @@ export default function VaultDetailPage() {
                                         purpose: purpose || "Savings Top Up",
                                         amount: amountToSave,
                                         txHash: receipt.transactionHash,
-                                        currentBalance: balance
+                                        currentBalance: balance,
+                                        currency: 'USDT0'
                                     })
                                 });
                             } else if (!isDeposit && profile.notificationPreferences.withdrawals) {
@@ -459,7 +476,8 @@ export default function VaultDetailPage() {
                                         userEmail: profile.email,
                                         purpose: purpose || "Savings Withdrawal",
                                         amount: amountToSave,
-                                        txHash: receipt.transactionHash
+                                        txHash: receipt.transactionHash,
+                                        currency: 'USDT0'
                                     })
                                 });
                             }
@@ -469,8 +487,9 @@ export default function VaultDetailPage() {
                     }
 
                     // Refetch data even on error fallback
-                    refetchBalance();
-                    refetchUserBalance();
+                    if (isFlare) {
+                        refetchUserBalance();
+                    }
 
                     if (isDeposit) {
                         setTopUpStep('done');
@@ -490,27 +509,143 @@ export default function VaultDetailPage() {
         }
     }, [isSuccess, router, hash, purpose, balance, receipt, sdk, isGeneratingProof, withdrawingAmount, userAddress, address, topUpStep, topUpAmount]);
 
-    const handleWithdrawUnlocked = () => {
-        try {
-            setWithdrawingAmount(balance); // Capture balance
-            toastId.current = toast.loading("Initializing Transaction...", toastStyle);
-            writeContract({
-                address,
-                abi: VAULT_ABI,
-                functionName: "withdraw",
-            });
-        } catch (error) {
-            console.error(error);
-            if (toastId.current) toast.dismiss(toastId.current);
+    const handleWithdrawUnlocked = async () => {
+        if (isFlare) {
+            try {
+                setWithdrawingAmount(balance); // Capture balance
+                toastId.current = toast.loading("Initializing Transaction...", toastStyle);
+                writeContract({
+                    address: address as `0x${string}`,
+                    abi: VAULT_ABI,
+                    functionName: "withdraw",
+                });
+            } catch (error) {
+                console.error(error);
+                if (toastId.current) toast.dismiss(toastId.current);
+            }
+        } else if (isSolana && publicKey && connection && anchorWallet) {
+            try {
+                setIsWithdrawProcessing(true);
+                setWithdrawingAmount(balance);
+                toastId.current = toast.loading("Confirming on-chain...", toastStyle);
+
+                const { getSigningProvider, getSaviqueProgram } = await import("@/lib/anchor");
+                const { getAssociatedTokenAddressSync } = await import("@solana/spl-token");
+
+                const provider = getSigningProvider(connection, anchorWallet);
+                const program = getSaviqueProgram(provider);
+                const vaultPubkey = new SolanaPubkey(address);
+
+                const isUsdc = currency === 'USDC';
+                const mint = isUsdc ? DEVNET_USDC_MINT : DEVNET_SHIP_MINT;
+
+                // Explicitly derive ATAs to ensure Anchor finds them
+                const vaultTokenAccount = getAssociatedTokenAddressSync(
+                    mint,
+                    vaultPubkey,
+                    true
+                );
+
+                const ownerTokenAccount = getAssociatedTokenAddressSync(
+                    mint,
+                    publicKey
+                );
+
+                // Use .rpc() for more reliable account resolution and better error messages
+                const signature = await (program.methods as any)
+                    .withdraw()
+                    .accounts({
+                        owner: publicKey,
+                        vault: vaultPubkey,
+                        mint: mint,
+                        vaultTokenAccount,
+                        ownerTokenAccount,
+                    })
+                    .rpc();
+
+                // Wait for confirmation
+                await connection.confirmTransaction(signature, "confirmed");
+
+                toast.dismiss(toastId.current as string);
+                toast.success("Withdrawal Successful!", toastStyle);
+
+                // Firebase receipt
+                await saveReceipt({
+                    walletAddress: publicKey.toBase58(),
+                    vaultAddress: address,
+                    txHash: signature,
+                    timestamp: Date.now(),
+                    purpose: purpose || "Solana Withdrawal",
+                    amount: balance,
+                    type: 'completed',
+                    verified: false, // Manual until PR integration
+                    currency: currency,
+                    decimals: decimals
+                });
+
+                // Add notification
+                await createNotification(
+                    publicKey.toBase58(),
+                    "Solana Withdrawal Successful! 💸",
+                    `Your funds from "${purpose || 'Savings'}" have been returned to your wallet.`,
+                    'success',
+                    '/dashboard/history'
+                );
+
+                // Send Email Notification
+                try {
+                    const profile = await getUserProfile(publicKey.toBase58());
+                    if (profile?.email && (!profile.notificationPreferences || profile.notificationPreferences.withdrawals)) {
+                        await fetch('/api/notify', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                type: 'WITHDRAWAL_SUCCESS',
+                                userEmail: profile.email,
+                                purpose: purpose || "Solana Withdrawal",
+                                amount: balance,
+                                txHash: signature,
+                                currency: currency
+                            })
+                        });
+                    }
+                } catch (emailErr) {
+                    console.warn('[Email] Failed to send Solana withdrawal notification:', emailErr);
+                }
+
+                router.push("/dashboard/savings");
+            } catch (error: any) {
+                console.error("Solana withdraw error:", error);
+                if (toastId.current) toast.dismiss(toastId.current as string);
+                toast.error(`Withdrawal Failed: ${error.message}`, toastStyle);
+
+                // Send Failure Email
+                try {
+                    const profile = await getUserProfile(publicKey.toBase58());
+                    if (profile?.email) {
+                        await fetch('/api/notify', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                type: 'TRANSACTION_FAILED',
+                                userEmail: profile.email,
+                                purpose: purpose || "Solana Withdrawal",
+                                amount: balance
+                            })
+                        });
+                    }
+                } catch (emailErr) {
+                    console.warn('[Email] Failed to send Solana withdrawal failure notification:', emailErr);
+                }
+            } finally {
+                setIsWithdrawProcessing(false);
+            }
         }
     };
-
-
 
     const handleTopUp = async (bypassAllowance = false) => {
         if (!userAddress || !topUpAmount) return;
 
-        const amountUnits = parseUnits(topUpAmount, decimals as number || 18);
         const currentTotal = parseFloat(balance);
         const adding = parseFloat(topUpAmount);
         const target = vaultData?.targetAmount ? parseFloat(vaultData.targetAmount) : 0;
@@ -521,38 +656,156 @@ export default function VaultDetailPage() {
             return;
         }
 
-        try {
-            // If we aren't bypassing, and we don't have enough allowance, trigger approval
-            if (!bypassAllowance && (!allowance || (allowance as bigint) < amountUnits)) {
-                setTopUpStep('approving');
-                if (toastId.current) toast.dismiss(toastId.current);
-                toastId.current = toast.loading("Approving USDT...", toastStyle);
-                writeContract({
-                    address: CONTRACTS.coston2.USDTToken,
-                    abi: ERC20_ABI,
-                    functionName: "approve",
-                    args: [address, BigInt("115792089237316195423570985008687907853269984665640564039457584007913129639935")]
-                });
-            } else {
-                setTopUpStep('depositing');
-                const msg = "Depositing USDT...";
-                if (toastId.current) {
-                    toast.loading(msg, { ...toastStyle, id: toastId.current });
+        if (isFlare) {
+            const amountUnits = parseUnits(topUpAmount, decimals as number || 18);
+            try {
+                if (!bypassAllowance && (!allowance || (allowance as bigint) < amountUnits)) {
+                    setTopUpStep('approving');
+                    if (toastId.current) toast.dismiss(toastId.current);
+                    toastId.current = toast.loading("Approving USDT...", toastStyle);
+                    writeContract({
+                        address: CONTRACTS.coston2.USDTToken,
+                        abi: ERC20_ABI,
+                        functionName: "approve",
+                        args: [address as `0x${string}`, BigInt("115792089237316195423570985008687907853269984665640564039457584007913129639935")]
+                    });
                 } else {
-                    toastId.current = toast.loading(msg, toastStyle);
+                    setTopUpStep('depositing');
+                    const msg = "Depositing USDT...";
+                    if (toastId.current) {
+                        toast.loading(msg, { ...toastStyle, id: toastId.current });
+                    } else {
+                        toastId.current = toast.loading(msg, toastStyle);
+                    }
+                    writeContract({
+                        address: address as `0x${string}`,
+                        abi: VAULT_ABI,
+                        functionName: "deposit",
+                        args: [amountUnits]
+                    });
+                    refetchAllowance();
                 }
-                writeContract({
-                    address,
-                    abi: VAULT_ABI,
-                    functionName: "deposit",
-                    args: [amountUnits]
-                });
-                // Ensure allowance is refreshed after we've used it
-                refetchAllowance();
+            } catch (e) {
+                console.error(e);
+                setTopUpStep('idle');
             }
-        } catch (e) {
-            console.error(e);
-            setTopUpStep('idle');
+        } else if (isSolana && publicKey && connection && anchorWallet) {
+            try {
+                setTopUpStep('depositing');
+                toastId.current = toast.loading(`Depositing ${currency}...`, toastStyle);
+
+                const { getSigningProvider, getSaviqueProgram } = await import("@/lib/anchor");
+                const { getAssociatedTokenAddressSync } = await import("@solana/spl-token");
+                const { BN } = await import("@coral-xyz/anchor");
+
+                const provider = getSigningProvider(connection, anchorWallet);
+                const program = getSaviqueProgram(provider);
+                const vaultPubkey = new SolanaPubkey(address);
+
+                // Determine Mint & Decimals
+                const isUsdc = currency === 'USDC';
+                const mint = isUsdc ? DEVNET_USDC_MINT : DEVNET_SHIP_MINT;
+                const vaultDecimals = isUsdc ? 6 : 9;
+                const rawAmount = Math.round(parseFloat(topUpAmount) * 10 ** vaultDecimals);
+
+                // Derive ATAs for explicit passing
+                const vaultTokenAccount = getAssociatedTokenAddressSync(
+                    mint,
+                    vaultPubkey,
+                    true
+                );
+                const ownerTokenAccount = getAssociatedTokenAddressSync(
+                    mint,
+                    publicKey
+                );
+
+                const signature = await (program.methods as any)
+                    .deposit(new BN(rawAmount))
+                    .accounts({
+                        owner: publicKey,
+                        vault: vaultPubkey,
+                        mint: mint,
+                        vaultTokenAccount,
+                        ownerTokenAccount,
+                    })
+                    .rpc();
+
+                await connection.confirmTransaction(signature, "confirmed");
+
+                toast.dismiss(toastId.current as string);
+                toast.success("Deposit Successful! 🚀", toastStyle);
+
+                // Firebase receipt
+                await saveReceipt({
+                    walletAddress: publicKey.toBase58(),
+                    vaultAddress: address,
+                    txHash: signature,
+                    timestamp: Date.now(),
+                    purpose: `Contributed: ${purpose}`,
+                    amount: topUpAmount,
+                    type: 'created',
+                    verified: false,
+                    currency: currency,
+                    decimals: decimals
+                });
+
+                // Add notification
+                await createNotification(
+                    publicKey.toBase58(),
+                    "Solana Deposit Successful! 🚀",
+                    `Successfully added ${topUpAmount} ${currency} to your "${purpose}" savings.`,
+                    'success',
+                    `/dashboard/savings/${address}`
+                );
+
+                // Send Email Notification
+                try {
+                    const profile = await getUserProfile(publicKey.toBase58());
+                    if (profile?.email && (!profile.notificationPreferences || profile.notificationPreferences.deposits)) {
+                        await fetch('/api/notify', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                type: 'TOP_UP_CONFIRMED',
+                                userEmail: profile.email,
+                                purpose: purpose || "Solana Top Up",
+                                amount: topUpAmount,
+                                txHash: signature,
+                                currentBalance: (parseFloat(balance) + parseFloat(topUpAmount)).toString(),
+                                currency: currency
+                            })
+                        });
+                    }
+                } catch (emailErr) {
+                    console.warn('[Email] Failed to send Solana top-up notification:', emailErr);
+                }
+
+                router.push("/dashboard/savings");
+            } catch (error: any) {
+                console.error("Solana deposit error:", error);
+                if (toastId.current) toast.dismiss(toastId.current as string);
+                toast.error(`Deposit Failed: ${error.message}`, toastStyle);
+                setTopUpStep('idle');
+
+                // Send Failure Email
+                try {
+                    const profile = await getUserProfile(publicKey.toBase58());
+                    if (profile?.email) {
+                        await fetch('/api/notify', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                type: 'TRANSACTION_FAILED',
+                                userEmail: profile.email,
+                                purpose: purpose || "Solana Top Up",
+                                amount: topUpAmount
+                            })
+                        });
+                    }
+                } catch (emailErr) {
+                    console.warn('[Email] Failed to send Solana top-up failure notification:', emailErr);
+                }
+            }
         }
     };
 
@@ -626,7 +879,7 @@ export default function VaultDetailPage() {
                             ? 'bg-red-500/10 border-red-500/20 text-red-500'
                             : 'bg-green-500/10 border-green-500/20 text-green-500'
                             }`}>
-                            {parseFloat(balance) <= 0 ? (withdrawalReceipt?.type === 'breaked' ? 'Broken' : 'Completed') : (isLocked ? "Locked" : "Active")}
+                            {parseFloat(balance) <= 0 ? (withdrawalReceipt?.type === 'breaked' ? 'Broken' : 'Completed') : (isLocked ? "Locked" : "Matured")}
                         </span>
                     </h1>
                 </div>
@@ -665,13 +918,13 @@ export default function VaultDetailPage() {
                                             </div>
                                             <div className="text-right">
                                                 <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Target</p>
-                                                <p className="text-sm font-bold text-primary">${parseFloat(vaultData.targetAmount).toLocaleString()}</p>
+                                                <p className="text-sm font-bold text-primary">{parseFloat(vaultData.targetAmount).toLocaleString()} {currency}</p>
                                             </div>
                                         </div>
                                         <Progress value={progressValue} className="h-2 bg-white/5 border border-white/10 overflow-hidden" />
                                         <div className="flex justify-between text-[10px] text-zinc-600">
-                                            <span>${parseFloat(balance).toLocaleString()} Saved</span>
-                                            <span>${(parseFloat(vaultData.targetAmount) - parseFloat(balance) > 0 ? parseFloat(vaultData.targetAmount) - parseFloat(balance) : 0).toLocaleString()} Remaining</span>
+                                            <span>{parseFloat(balance).toLocaleString()} {currency} Saved</span>
+                                            <span>{(parseFloat(vaultData.targetAmount) - parseFloat(balance) > 0 ? parseFloat(vaultData.targetAmount) - parseFloat(balance) : 0).toLocaleString()} Remaining</span>
                                         </div>
                                     </div>
                                 ) : null}
@@ -683,12 +936,14 @@ export default function VaultDetailPage() {
                                 </div>
                                 <div>
                                     <h2 className="text-4xl font-bold text-white mb-2">
-                                        {withdrawalReceipt?.type === 'breaked' ? 'Savings Closed' : 'Goal Achieved!'}
+                                        {withdrawalReceipt?.type === 'breaked' ? 'Savings Closed' : (parseFloat(balance) > 0 ? 'Savings Unlocked!' : 'Goal Achieved!')}
                                     </h2>
                                     <p className="text-zinc-400 max-w-sm mx-auto">
                                         {withdrawalReceipt?.type === 'breaked'
                                             ? 'This Savings was closed early. Your principal (after penalty) has been returned to your wallet.'
-                                            : 'You have successfully completed your savings goal. Your funds have been withdrawn.'}
+                                            : (parseFloat(balance) > 0
+                                                ? 'Your savings period has ended. Your funds are now available for withdrawal.'
+                                                : 'You have successfully completed your savings goal. Your funds have been withdrawn.')}
                                     </p>
                                 </div>
                             </>
@@ -708,16 +963,16 @@ export default function VaultDetailPage() {
                                 <div className="space-y-2">
                                     <h3 className="text-2xl font-bold text-white flex items-baseline gap-1">
                                         {parseFloat(balance) > 0
-                                            ? parseFloat(balance).toFixed(2)
+                                            ? parseFloat(balance).toLocaleString(undefined, { maximumFractionDigits: 2 })
                                             : (withdrawalReceipt ? withdrawalReceipt.amount : "0.00")
-                                        } <span className="text-sm font-normal text-zinc-500">USDT0</span>
+                                        } <span className="text-sm font-normal text-zinc-500">{currency}</span>
                                     </h3>
 
                                     {/* Penalty Indicator for Broken Vaults */}
                                     {withdrawalReceipt?.penalty && parseFloat(withdrawalReceipt.penalty) > 0 && (
                                         <div className="flex items-center gap-2 text-red-500/80 text-[10px] font-bold uppercase tracking-wider">
                                             <AlertTriangle className="w-3 h-3" />
-                                            Penalty Applied: -{withdrawalReceipt.penalty} USDT0
+                                            Penalty Applied: -{withdrawalReceipt.penalty} {currency}
                                         </div>
                                     )}
                                 </div>
@@ -754,7 +1009,7 @@ export default function VaultDetailPage() {
                             </Button>
                         ) : isLocked ? (
                             <>
-                                {vaultData?.targetAmount && parseFloat(vaultData.targetAmount) > 0 && (
+                                {vaultData?.targetAmount && parseFloat(vaultData.targetAmount) > 0 && progressValue < 100 && (
                                     <>
                                         {isTopUpMode ? (
                                             <motion.div
@@ -765,8 +1020,8 @@ export default function VaultDetailPage() {
                                                 <div className="space-y-2">
                                                     <div className="flex justify-between text-xs">
                                                         <span className="text-zinc-500">Amount to Add</span>
-                                                        {userBalance !== undefined && (
-                                                            <span className="text-zinc-400">Bal: {formatUnits(userBalance as bigint, decimals as number || 18)} USDT0</span>
+                                                        {isFlare && userBalance !== undefined && (
+                                                            <span className="text-zinc-400">Bal: {formatUnits(userBalance as bigint, 6)} USDT0</span>
                                                         )}
                                                     </div>
                                                     <div className="relative">
@@ -826,9 +1081,9 @@ export default function VaultDetailPage() {
                                         size="lg"
                                         className="w-full bg-[#E62058] hover:bg-[#E62058]/90 text-white shadow-lg shadow-primary/20"
                                         onClick={handleWithdrawUnlocked}
-                                        disabled={isWithdrawPending || isConfirming}
+                                        disabled={isWithdrawPending || isConfirming || isWithdrawProcessing}
                                     >
-                                        {isWithdrawPending || isConfirming ? "Processing..." : "Withdraw Funds"}
+                                        {isWithdrawPending || isConfirming || isWithdrawProcessing ? "Processing..." : "Withdraw Funds"}
                                     </Button>
                                 )}
 
@@ -836,7 +1091,7 @@ export default function VaultDetailPage() {
 
                                 {!isOwner && (
                                     <Button disabled className="w-full bg-zinc-800/50 text-zinc-500 border border-zinc-700/30 cursor-not-allowed">
-                                        Vault Matured
+                                        Savings Matured
                                     </Button>
                                 )}
                             </div>
@@ -849,9 +1104,9 @@ export default function VaultDetailPage() {
                 isOpen={isBreakModalOpen}
                 onClose={() => setIsBreakModalOpen(false)}
                 address={address}
-                purpose={purpose || ""}
+                purpose={purpose as string}
                 balance={balance}
-            />
-        </div>
+                currency={currency}
+            />    </div>
     );
-} 
+}

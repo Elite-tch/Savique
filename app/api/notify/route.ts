@@ -14,7 +14,8 @@ export async function POST(req: NextRequest) {
             proofRailsId,
             daysRemaining,
             targetAmount,
-            currentBalance
+            currentBalance,
+            currency
         } = body;
 
         if (!type || !userEmail || !purpose) {
@@ -33,7 +34,8 @@ export async function POST(req: NextRequest) {
             proofRailsId,
             daysRemaining,
             targetAmount,
-            currentBalance
+            currentBalance,
+            currency
         });
 
         return NextResponse.json({ success: true, message: 'Notification sent' });

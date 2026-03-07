@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { Bell, Check, Info, AlertTriangle, CheckCircle, ExternalLink } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useAccount } from 'wagmi';
+import { useEcosystemAccount } from '@/hooks/useEcosystemAccount';
 import { AppNotification, subscribeToNotifications, markAsRead, markAllAsRead } from '@/lib/notificationService';
 import Link from 'next/link';
 
 export function NotificationBell() {
-    const { address } = useAccount();
+    const { address } = useEcosystemAccount();
     const [notifications, setNotifications] = useState<AppNotification[]>([]);
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);

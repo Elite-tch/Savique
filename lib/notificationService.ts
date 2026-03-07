@@ -40,7 +40,7 @@ export async function createNotification(
     try {
         console.log('[Notification] Creating notification:', { recipient, title, message, type, link, receiptId });
         await addDoc(collection(db, NOTIFICATION_COLLECTION), {
-            recipient: recipient.toLowerCase(),
+            recipient: recipient.startsWith('0x') ? recipient.toLowerCase() : recipient,
             title,
             message,
             type,
@@ -89,11 +89,15 @@ export function subscribeToNotifications(
     walletAddress: string,
     callback: (notifications: AppNotification[]) => void
 ) {
+    const addressToQuery = Array.from(new Set(
+        walletAddress.startsWith('0x')
+            ? [walletAddress.toLowerCase()]
+            : [walletAddress, walletAddress.toLowerCase()]
+    ));
+
     const q = query(
         collection(db, NOTIFICATION_COLLECTION),
-        where('recipient', '==', walletAddress.toLowerCase()),
-        orderBy('timestamp', 'desc'),
-        limit(20)
+        where('recipient', 'in', addressToQuery)
     );
 
     return onSnapshot(q, (snapshot) => {
@@ -112,7 +116,10 @@ export function subscribeToNotifications(
                 receiptId: data.receiptId
             });
         });
-        callback(notifications);
+
+        // Manual sort by timestamp desc
+        const sorted = notifications.sort((a, b) => b.timestamp - a.timestamp);
+        callback(sorted.slice(0, 20)); // Limit to most recent 20
     }, (error) => {
         console.error('[NotificationService] Subscription error:', error);
     });

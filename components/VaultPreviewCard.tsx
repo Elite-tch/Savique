@@ -10,30 +10,12 @@ import { useEffect, useState, useMemo } from "react";
 import { getVaultByAddress, SavedVault } from "@/lib/receiptService";
 import { Progress } from "@/components/ui/progress";
 
-export function VaultPreviewCard({ address, index }: { address: `0x${string}`; index: number }) {
-    const { data: purpose } = useReadContract({
-        address,
-        abi: VAULT_ABI,
-        functionName: "purpose",
-    });
+import { useVaultData } from "@/hooks/useVaultData";
+import { useEcosystem } from "@/context/EcosystemContext";
 
-    const { data: balanceResult } = useReadContract({
-        address,
-        abi: VAULT_ABI,
-        functionName: "totalAssets",
-    });
-
-    const { data: unlockTimeResult } = useReadContract({
-        address,
-        abi: VAULT_ABI,
-        functionName: "unlockTimestamp",
-    });
-
-    const { data: decimals } = useReadContract({
-        address: CONTRACTS.coston2.USDTToken,
-        abi: ERC20_ABI,
-        functionName: 'decimals',
-    });
+export function VaultPreviewCard({ address, index }: { address: string; index: number }) {
+    const { data: vaultChainData, loading } = useVaultData(address);
+    const { isFlare, isSolana } = useEcosystem();
 
     const [vaultData, setVaultData] = useState<SavedVault | null>(null);
 
@@ -45,24 +27,47 @@ export function VaultPreviewCard({ address, index }: { address: `0x${string}`; i
         fetchVault();
     }, [address]);
 
+    const currency = vaultChainData?.currency || (isFlare ? 'USDT0' : 'SHIP');
+    const decimals = (vaultChainData as any)?.decimals || (currency === 'USDC' ? 6 : (isFlare ? 6 : 9));
+
     const progressValue = useMemo(() => {
-        if (!vaultData?.targetAmount || !balanceResult || !decimals) return 0;
-        const current = parseFloat(formatUnits(balanceResult as bigint, decimals as number || 18));
+        if (!vaultData?.targetAmount || !vaultChainData?.balance) return 0;
+        const current = parseFloat(formatUnits(BigInt(vaultChainData.balance), decimals));
         const target = parseFloat(vaultData.targetAmount);
         if (target === 0) return 100;
         return Math.min(100, (current / target) * 100);
-    }, [vaultData, balanceResult, decimals]);
+    }, [vaultData, vaultChainData, decimals]);
 
-    const balance = balanceResult ? formatUnits(balanceResult, decimals || 18) : "0";
-    const unlockDate = unlockTimeResult ? new Date(Number(unlockTimeResult) * 1000) : new Date();
+    const formattedBalance = vaultChainData?.balance
+        ? formatUnits(BigInt(vaultChainData.balance), decimals)
+        : "0";
+
+    const unlockDate = vaultChainData?.unlockTimestamp
+        ? new Date(vaultChainData.unlockTimestamp * 1000)
+        : new Date();
+
     const isLocked = new Date() < unlockDate;
+
+    if (loading) {
+        return (
+            <Card className="bg-zinc-900/40 border-zinc-800/50 p-8 h-full animate-pulse">
+                <div className="h-6 w-32 bg-white/5 rounded mb-4" />
+                <div className="space-y-4 mt-auto">
+                    <div className="h-4 w-full bg-white/5 rounded" />
+                    <div className="h-4 w-full bg-white/5 rounded" />
+                </div>
+            </Card>
+        );
+    }
 
     return (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.1 }} className="h-full">
             <Link href={`/dashboard/savings/${address}`} className="h-full block">
                 <Card className="bg-zinc-900/40 border-zinc-800/50 hover:border-zinc-700 transition-all cursor-pointer group p-8 h-full flex flex-col">
                     <div className="flex justify-between items-start mb-4">
-                        <h3 className="text-lg font-bold text-white truncate">{purpose || "Loading..."}</h3>
+                        <h3 className="text-lg font-bold text-white truncate">
+                            {vaultChainData?.purpose || vaultData?.purpose || "Savings Plan"}
+                        </h3>
                         <div className={`px-2 py-1 rounded text-xs font-medium shrink-0 ${isLocked ? 'bg-orange-500/10 text-orange-400' : 'bg-green-500/10 text-green-400'}`}>
                             {isLocked ? 'Locked' : 'Unlocked'}
                         </div>
@@ -70,7 +75,9 @@ export function VaultPreviewCard({ address, index }: { address: `0x${string}`; i
                     <div className="space-y-4 mt-auto">
                         <div className="flex justify-between text-sm">
                             <span className="text-gray-400">Balance:</span>
-                            <span className="text-white font-medium">${parseFloat(balance).toFixed(2)}</span>
+                            <span className="text-white font-medium">
+                                {parseFloat(formattedBalance).toLocaleString()} {currency}
+                            </span>
                         </div>
 
                         {vaultData?.targetAmount && parseFloat(vaultData.targetAmount) > 0 && (

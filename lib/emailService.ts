@@ -36,6 +36,7 @@ interface EmailData {
     daysRemaining?: number;
     targetAmount?: string;
     currentBalance?: string;
+    currency?: string;
 }
 
 export async function sendNotificationEmail(type: EmailType, data: EmailData) {
@@ -52,7 +53,14 @@ export async function sendNotificationEmail(type: EmailType, data: EmailData) {
     const logoUrl = 'https://res.cloudinary.com/dibwnfwk9/image/upload/v1770464073/ChatGPT_Image_Feb_6__2026__07_08_19_AM-removebg-preview_tvlkzh.png'; // Your Savique logo
     const proofRailsUrl = data.proofRailsId ? `https://proofrails-clone-middleware.onrender.com/receipt/${data.proofRailsId}` : '';
     const qrCodeUrl = data.proofRailsId ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${proofRailsUrl}` : '';
-    const explorerUrl = data.txHash ? `https://coston2-explorer.flare.network/tx/${data.txHash}` : '';
+    const isSolanaTx = data.txHash ? !data.txHash.startsWith('0x') : false;
+    const currency = data.currency || (isSolanaTx ? 'SHIP' : 'USDT0');
+    const networkName = isSolanaTx ? 'Solana Devnet' : 'Flare Coston2 Network';
+    const explorerUrl = data.txHash
+        ? (data.txHash.startsWith('0x')
+            ? `https://coston2-explorer.flare.network/tx/${data.txHash}`
+            : `https://explorer.solana.com/tx/${data.txHash}?cluster=devnet`)
+        : '';
 
     switch (type) {
         case 'DEPOSIT_CONFIRMED':
@@ -93,7 +101,7 @@ export async function sendNotificationEmail(type: EmailType, data: EmailData) {
                                                         <table width="100%" cellpadding="8" cellspacing="0">
                                                             <tr>
                                                                 <td style="color: #71717A; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">Amount</td>
-                                                                <td align="right" style="color: #18181B; font-size: 20px; font-weight: 700;">${data.amount} USDT0</td>
+                                                                <td align="right" style="color: #18181B; font-size: 20px; font-weight: 700;">${data.amount} ${currency}</td>
                                                             </tr>
                                                             ${data.unlockDate ? `
                                                             <tr>
@@ -139,8 +147,16 @@ export async function sendNotificationEmail(type: EmailType, data: EmailData) {
                                             </table>
                                             ` : ''}
                                             
+                                            ${!data.proofRailsId && data.txHash ? `
+                                            <div style="text-align: center; margin: 24px 0;">
+                                                <a href="${explorerUrl}" style="display: inline-block; background-color: #f4f4f5; color: #18181B; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px; border: 1px solid #E4E4E7;">
+                                                    View Transaction on Explorer
+                                                </a>
+                                            </div>
+                                            ` : ''}
+
                                             <p style="color: #A1A1AA; font-size: 12px; margin: 24px 0 0 0; line-height: 1.5;">
-                                                This is a verifiable ProofRails receipt. Keep it for your records. Your commitment is secured on the Flare Coston2 Network.<br>
+                                                This is a verifiable Savique receipt. Keep it for your records. Your commitment is secured on the ${networkName}.<br>
                                                 <strong style="color: #71717A;">💡 Tip:</strong> Download a PDF copy from the History page in your dashboard.
                                             </p>
                                         </td>
@@ -150,7 +166,7 @@ export async function sendNotificationEmail(type: EmailType, data: EmailData) {
                                     <tr>
                                         <td style="background-color: #FAFAFA; padding: 24px; text-align: center; border-top: 1px solid #E4E4E7;">
                                             <p style="margin: 0; color: #A1A1AA; font-size: 12px;">
-                                                Savique Protocol • Decentralized Savings on Flare Network
+                                                Savique Protocol • Secured on ${isSolanaTx ? 'Solana' : 'Flare Network'}
                                             </p>
                                         </td>
                                     </tr>
@@ -200,12 +216,12 @@ export async function sendNotificationEmail(type: EmailType, data: EmailData) {
                                                         <table width="100%" cellpadding="8" cellspacing="0">
                                                             <tr>
                                                                 <td style="color: #6D28D9; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">Amount Added</td>
-                                                                <td align="right" style="color: #5B21B6; font-size: 20px; font-weight: 700;">+${data.amount} USDT0</td>
+                                                                <td align="right" style="color: #5B21B6; font-size: 20px; font-weight: 700;">+${data.amount} ${currency}</td>
                                                             </tr>
                                                             ${data.currentBalance ? `
                                                             <tr>
                                                                 <td style="color: #6D28D9; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">New Balance</td>
-                                                                <td align="right" style="color: #5B21B6; font-size: 14px; font-weight: 600;">${data.currentBalance} USDT0</td>
+                                                                <td align="right" style="color: #5B21B6; font-size: 14px; font-weight: 600;">${data.currentBalance} ${currency}</td>
                                                             </tr>
                                                             ` : ''}
                                                             ${data.unlockDate ? `
@@ -235,7 +251,7 @@ export async function sendNotificationEmail(type: EmailType, data: EmailData) {
                                                         <table width="100%" cellpadding="0" cellspacing="0">
                                                             <tr>
                                                                 <td style="vertical-align: top; width: 70%;">
-                                                                    <h3 style="margin: 0 0 8px 0; color: #18181B; font-size: 16px; font-weight: 700;">✓ ProofRails Verified</h3>
+                                                                    <h3 style="margin: 0 0 8px 0; color: #18181B; font-size: 16px; font-weight: 700;">✓ Savique Verified</h3>
                                                                     <p style="margin: 0 0 16px 0; color: #71717A; font-size: 13px; line-height: 1.5;">
                                                                         This top-up has been verified on the blockchain.
                                                                     </p>
@@ -255,6 +271,14 @@ export async function sendNotificationEmail(type: EmailType, data: EmailData) {
                                             </table>
                                             ` : ''}
                                             
+                                            ${!data.proofRailsId && data.txHash ? `
+                                            <div style="text-align: center; margin: 24px 0;">
+                                                <a href="${explorerUrl}" style="display: inline-block; background-color: #f4f4f5; color: #18181B; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px; border: 1px solid #E4E4E7;">
+                                                    View Transaction on Explorer
+                                                </a>
+                                            </div>
+                                            ` : ''}
+
                                             <p style="color: #52525B; font-size: 15px; line-height: 1.6;">
                                                 Every deposit brings you closer to your goal. Stay consistent!
                                             </p>
@@ -265,7 +289,7 @@ export async function sendNotificationEmail(type: EmailType, data: EmailData) {
                                     <tr>
                                         <td style="background-color: #FAFAFA; padding: 24px; text-align: center; border-top: 1px solid #E4E4E7;">
                                             <p style="margin: 0; color: #A1A1AA; font-size: 12px;">
-                                                Savique Protocol • Decentralized Savings on Flare Network
+                                                Savique Protocol • Secured on ${isSolanaTx ? 'Solana' : 'Flare Network'}
                                             </p>
                                         </td>
                                     </tr>
@@ -315,7 +339,7 @@ export async function sendNotificationEmail(type: EmailType, data: EmailData) {
                                                         <table width="100%" cellpadding="8" cellspacing="0">
                                                             <tr>
                                                                 <td style="color: #92400E; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">Current Balance</td>
-                                                                <td align="right" style="color: #78350F; font-size: 20px; font-weight: 700;">${data.amount} USDT0</td>
+                                                                <td align="right" style="color: #78350F; font-size: 20px; font-weight: 700;">${data.amount} ${currency}</td>
                                                             </tr>
                                                             <tr>
                                                                 <td style="color: #92400E; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">Unlock Date</td>
@@ -326,6 +350,13 @@ export async function sendNotificationEmail(type: EmailType, data: EmailData) {
                                                 </tr>
                                             </table>
                                             
+                                            ${!data.proofRailsId && data.txHash ? `
+                                            <div style="text-align: center; margin: 24px 0;">
+                                                <a href="${explorerUrl}" style="display: inline-block; background-color: #f4f4f5; color: #18181B; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px; border: 1px solid #E4E4E7;">
+                                                    View Transaction on Explorer
+                                                </a>
+                                            </div>
+                                            ` : ''}
                                             <p style="color: #52525B; font-size: 15px; line-height: 1.6;">
                                                 Stay disciplined! You are almost at the finish line. Once unlocked, you can withdraw your principal plus any success bonus.
                                             </p>
@@ -336,7 +367,7 @@ export async function sendNotificationEmail(type: EmailType, data: EmailData) {
                                     <tr>
                                         <td style="background-color: #FAFAFA; padding: 24px; text-align: center; border-top: 1px solid #E4E4E7;">
                                             <p style="margin: 0; color: #A1A1AA; font-size: 12px;">
-                                                Savique Protocol • Decentralized Savings on Flare Network
+                                                Savique Protocol • Secured on ${isSolanaTx ? 'Solana' : 'Flare Network'}
                                             </p>
                                       </td>
                                     </tr>
@@ -387,7 +418,7 @@ export async function sendNotificationEmail(type: EmailType, data: EmailData) {
                                                     <td style="padding: 24px; text-align: center;">
                                                         <p style="color: ${urgencyColor}; font-size: 14px; font-weight: 600; margin: 0 0 8px 0; text-transform: uppercase; letter-spacing: 1px;">Unlocks On</p>
                                                         <p style="color: #18181B; font-size: 24px; font-weight: 700; margin: 0;">${data.unlockDate}</p>
-                                                        ${data.amount ? `<p style="color: #71717A; font-size: 14px; margin: 12px 0 0 0;">Current Balance: <strong>${data.amount} USDT0</strong></p>` : ''}
+                                                        ${data.amount ? `<p style="color: #71717A; font-size: 14px; margin: 12px 0 0 0;">Current Balance: <strong>${data.amount} ${currency}</strong></p>` : ''}
                                                     </td>
                                                 </tr>
                                             </table>
@@ -408,7 +439,7 @@ export async function sendNotificationEmail(type: EmailType, data: EmailData) {
                                     <tr>
                                         <td style="background-color: #FAFAFA; padding: 24px; text-align: center; border-top: 1px solid #E4E4E7;">
                                             <p style="margin: 0; color: #A1A1AA; font-size: 12px;">
-                                                Savique Protocol • Decentralized Savings on Flare Network
+                                                Savique Protocol • Secured on ${isSolanaTx ? 'Solana' : 'Flare Network'}
                                             </p>
                                         </td>
                                     </tr>
@@ -459,13 +490,13 @@ export async function sendNotificationEmail(type: EmailType, data: EmailData) {
                                                             ${data.currentBalance ? `
                                                             <tr>
                                                                 <td style="color: #1E40AF; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">Current Balance</td>
-                                                                <td align="right" style="color: #1E3A8A; font-size: 20px; font-weight: 700;">${data.currentBalance} USDT0</td>
+                                                                <td align="right" style="color: #1E3A8A; font-size: 20px; font-weight: 700;">${data.currentBalance} ${currency}</td>
                                                             </tr>
                                                             ` : ''}
                                                             ${data.targetAmount ? `
                                                             <tr>
                                                                 <td style="color: #1E40AF; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">Target Amount</td>
-                                                                <td align="right" style="color: #1E3A8A; font-size: 14px; font-weight: 600;">${data.targetAmount} USDT0</td>
+                                                                <td align="right" style="color: #1E3A8A; font-size: 14px; font-weight: 600;">${data.targetAmount} ${currency}</td>
                                                             </tr>
                                                             ` : ''}
                                                             ${data.daysRemaining ? `
@@ -499,7 +530,7 @@ export async function sendNotificationEmail(type: EmailType, data: EmailData) {
                                     <tr>
                                         <td style="background-color: #FAFAFA; padding: 24px; text-align: center; border-top: 1px solid #E4E4E7;">
                                             <p style="margin: 0; color: #A1A1AA; font-size: 12px;">
-                                                Savique Protocol • Decentralized Savings on Flare Network
+                                                Savique Protocol • Secured on ${isSolanaTx ? 'Solana' : 'Flare Network'}
                                             </p>
                                         </td>
                                     </tr>
@@ -549,7 +580,7 @@ export async function sendNotificationEmail(type: EmailType, data: EmailData) {
                                                         <table width="100%" cellpadding="8" cellspacing="0">
                                                             <tr>
                                                                 <td style="color: #047857; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">Amount Withdrawn</td>
-                                                                <td align="right" style="color: #065F46; font-size: 20px; font-weight: 700;">${data.amount} USDT0</td>
+                                                                <td align="right" style="color: #065F46; font-size: 20px; font-weight: 700;">${data.amount} ${currency}</td>
                                                             </tr>
                                                             <tr>
                                                                 <td style="color: #047857; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">Status</td>
@@ -595,6 +626,14 @@ export async function sendNotificationEmail(type: EmailType, data: EmailData) {
                                             </table>
                                             ` : ''}
                                             
+                                            ${!data.proofRailsId && data.txHash ? `
+                                            <div style="text-align: center; margin: 24px 0;">
+                                                <a href="${explorerUrl}" style="display: inline-block; background-color: #f4f4f5; color: #18181B; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px; border: 1px solid #E4E4E7;">
+                                                    View Transaction on Explorer
+                                                </a>
+                                            </div>
+                                            ` : ''}
+
                                             <p style="color: #52525B; font-size: 15px; line-height: 1.6;">
                                                 Ready for your next savings goal? Start building towards your dreams again!
                                             </p>
@@ -605,7 +644,7 @@ export async function sendNotificationEmail(type: EmailType, data: EmailData) {
                                     <tr>
                                         <td style="background-color: #FAFAFA; padding: 24px; text-align: center; border-top: 1px solid #E4E4E7;">
                                             <p style="margin: 0; color: #A1A1AA; font-size: 12px;">
-                                                Savique Protocol • Decentralized Savings on Flare Network<br>
+                                                Savique Protocol • Secured on ${isSolanaTx ? 'Solana' : 'Flare Network'}<br>
                                                 <strong style="color: #71717A;">💡 Tip:</strong> Download a PDF copy from the History page in your dashboard.
                                             </p>
                                         </td>
@@ -656,11 +695,11 @@ export async function sendNotificationEmail(type: EmailType, data: EmailData) {
                                                         <table width="100%" cellpadding="8" cellspacing="0">
                                                             <tr>
                                                                 <td style="color: #991B1B; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">Amount Recovered</td>
-                                                                <td align="right" style="color: #7F1D1D; font-size: 20px; font-weight: 700;">${data.amount} USDT0</td>
+                                                                <td align="right" style="color: #7F1D1D; font-size: 20px; font-weight: 700;">${data.amount} ${currency}</td>
                                                             </tr>
                                                             <tr>
                                                                 <td style="color: #991B1B; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">Penalty Applied</td>
-                                                                <td align="right" style="color: #DC2626; font-size: 14px; font-weight: 600;">10% + Bonus Forfeiture</td>
+                                                                <td align="right" style="color: #DC2626; font-size: 14px; font-weight: 600;">Early Withdrawal Fee Applied</td>
                                                             </tr>
                                                             ${data.txHash ? `
                                                             <tr>
@@ -702,6 +741,14 @@ export async function sendNotificationEmail(type: EmailType, data: EmailData) {
                                             </table>
                                             ` : ''}
                                             
+                                            ${!data.proofRailsId && data.txHash ? `
+                                            <div style="text-align: center; margin: 24px 0;">
+                                                <a href="${explorerUrl}" style="display: inline-block; background-color: #f4f4f5; color: #18181B; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px; border: 1px solid #E4E4E7;">
+                                                    View Transaction on Explorer
+                                                </a>
+                                            </div>
+                                            ` : ''}
+
                                             <div style="background-color: #FEF9C3; border-radius: 8px; padding: 16px; border: 1px solid #FDE047;">
                                                 <p style="margin: 0; color: #713F12; font-size: 14px; line-height: 1.5;">
                                                     💡 <strong>Pro Tip:</strong> Consider creating a separate "Emergency Fund" savings in the future. This way, you can handle unexpected expenses without breaking your main savings goals.
@@ -714,7 +761,7 @@ export async function sendNotificationEmail(type: EmailType, data: EmailData) {
                                     <tr>
                                         <td style="background-color: #FAFAFA; padding: 24px; text-align: center; border-top: 1px solid #E4E4E7;">
                                             <p style="margin: 0; color: #A1A1AA; font-size: 12px;">
-                                                Savique Protocol • Decentralized Savings on Flare Network<br>
+                                                Savique Protocol • Secured on ${isSolanaTx ? 'Solana' : 'Flare Network'}<br>
                                                 <strong style="color: #71717A;">💡 Tip:</strong> Download a PDF copy from the History page in your dashboard.
                                             </p>
                                         </td>
@@ -765,7 +812,7 @@ export async function sendNotificationEmail(type: EmailType, data: EmailData) {
                                                         <table width="100%" cellpadding="8" cellspacing="0">
                                                             <tr>
                                                                 <td style="color: #991B1B; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">Amount Attempted</td>
-                                                                <td align="right" style="color: #991B1B; font-size: 20px; font-weight: 700;">${data.amount} USDT0</td>
+                                                                <td align="right" style="color: #991B1B; font-size: 20px; font-weight: 700;">${data.amount} ${currency}</td>
                                                             </tr>
                                                             ${data.txHash ? `
                                                             <tr>
@@ -783,8 +830,8 @@ export async function sendNotificationEmail(type: EmailType, data: EmailData) {
                                             <div style="background-color: #F8FAFC; border-radius: 8px; padding: 16px; border: 1px solid #E2E8F0; margin-bottom: 24px;">
                                                 <p style="margin: 0; color: #475569; font-size: 14px; line-height: 1.5;">
                                                     <strong>Possible Reasons:</strong><br>
-                                                    • Insufficient USDT0 balance for the transaction.<br>
-                                                    • Network congestion on Flare Coston2.<br>
+                                                    • Insufficient ${currency} balance for the transaction.<br>
+                                                     • Network congestion on ${networkName}.<br>
                                                     • Transaction timed out or was manually rejected in wallet.
                                                 </p>
                                             </div>
@@ -801,7 +848,7 @@ export async function sendNotificationEmail(type: EmailType, data: EmailData) {
                                     <tr>
                                         <td style="background-color: #FAFAFA; padding: 24px; text-align: center; border-top: 1px solid #E4E4E7;">
                                             <p style="margin: 0; color: #A1A1AA; font-size: 12px;">
-                                                Savique Protocol • Decentralized Savings on Flare Network
+                                                Savique Protocol • Secured on ${isSolanaTx ? 'Solana' : 'Flare Network'}
                                             </p>
                                         </td>
                                     </tr>

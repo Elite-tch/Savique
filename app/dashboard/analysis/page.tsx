@@ -29,10 +29,11 @@ import {
     Lightbulb
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useAccount } from "wagmi";
 import { getReceiptsByWallet, Receipt } from "@/lib/receiptService";
 import { generateStatement } from "@/lib/statementGenerator";
 import { toast } from "sonner";
+import { useEcosystemAccount } from "@/hooks/useEcosystemAccount";
+import { useEcosystem } from "@/context/EcosystemContext";
 
 // Recharts for Visualization
 import {
@@ -54,7 +55,8 @@ import {
 const COLORS = ['#E62058', '#22C55E', '#F97316', '#3B82F6'];
 
 export default function AnalysisPage() {
-    const { address: currentAddress, isConnected } = useAccount();
+    const { address: currentAddress, isConnected } = useEcosystemAccount();
+    const { isSolana } = useEcosystem();
 
     // Data State
     const [receipts, setReceipts] = useState<Receipt[]>([]);
@@ -266,11 +268,12 @@ export default function AnalysisPage() {
                                     fontSize={10}
                                     tickLine={false}
                                     axisLine={false}
-                                    tickFormatter={(val) => `$${val}`}
+                                    tickFormatter={(val) => `${val}`}
                                 />
                                 <Tooltip
                                     contentStyle={{ backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '12px' }}
                                     itemStyle={{ color: '#fff', fontSize: '12px' }}
+                                    formatter={((value: any) => value !== undefined ? [`${Number(value).toFixed(2)} ${isSolana ? 'SHIP' : 'USDT0'}`, 'Balance'] : ['', 'Balance']) as any}
                                 />
                                 <Area
                                     type="monotone"
@@ -357,7 +360,7 @@ export default function AnalysisPage() {
                                 <YAxis stroke="#3f3f46" fontSize={10} axisLine={false} tickLine={false} hide />
                                 <Tooltip
                                     contentStyle={{ backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '12px' }}
-                                    formatter={(value: number | undefined) => value ? [`$${value.toFixed(2)}`, ''] : ['', '']}
+                                    formatter={((value: number | undefined) => value ? [`${value.toFixed(2)} ${isSolana ? 'SHIP' : 'USDT0'}`, ''] : ['', '']) as any}
                                 />
                                 <Area type="monotone" dataKey="total" stroke="#FB923C" strokeWidth={3} fillOpacity={1} fill="url(#colorTotal)" />
                                 <Area type="monotone" dataKey="principal" stroke="#3f3f46" strokeDasharray="5 5" fill="none" />

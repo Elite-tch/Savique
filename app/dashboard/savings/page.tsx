@@ -10,7 +10,7 @@ import { useAccount, useReadContract } from "wagmi";
 import { CONTRACTS, VAULT_FACTORY_ABI, VAULT_ABI, ERC20_ABI } from "@/lib/contracts";
 import { formatUnits } from "viem";
 import { motion } from "framer-motion";
-import { getReceiptsByWallet, Receipt, getUserVaultsFromDb, saveVault, getVaultByAddress, SavedVault } from "@/lib/receiptService";
+import { getReceiptsByWallet, Receipt, getUserVaultsFromDb, saveVault, getVaultByAddress, SavedVault, getReceiptsByVault } from "@/lib/receiptService";
 import { usePublicClient } from "wagmi";
 import { Progress } from "@/components/ui/progress";
 import { Suspense, useMemo } from "react";
@@ -18,6 +18,12 @@ import { ChevronLeft, ChevronRight, FileText, CheckCircle2, History } from "luci
 import { generateReceiptPDF } from "../../../lib/pdfGenerator";
 import { saveAs } from "file-saver";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useEcosystemAccount } from "@/hooks/useEcosystemAccount";
+import { useVaults } from "@/hooks/useVaults";
+import { useEcosystem } from "@/context/EcosystemContext";
+import { useVaultData } from "@/hooks/useVaultData";
+import { useConnection } from "@solana/wallet-adapter-react";
+import { DEVNET_USDC_MINT } from "@/lib/solana";
 
 function useCountdown(targetDate: Date) {
     const [timeLeft, setTimeLeft] = useState({
@@ -99,7 +105,7 @@ function CompletedVaultCard({
                             <p className="text-[10px] text-zinc-500 uppercase font-bold mb-0.5">Withdrawn</p>
                             <div className="flex items-baseline gap-1">
                                 <span className="text-xl font-bold text-white">{receipt?.amount || "0.00"}</span>
-                                <span className="text-[10px] text-zinc-500">USDT0</span>
+                                <span className="text-[10px] text-zinc-500">{vault.currency || (vault.vaultAddress.startsWith('0x') ? 'USDT0' : 'SHIP')}</span>
                             </div>
                         </div>
                         <div className="text-right">
@@ -110,18 +116,8 @@ function CompletedVaultCard({
                         </div>
                     </div>
 
-                    <div className="pt-3 border-t border-white/5 flex gap-2">
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            className="flex-1 h-8 text-[10px] bg-white/5 hover:bg-white/10 text-zinc-400"
-                            onClick={handleDownload}
-                            disabled={!receipt}
-                        >
-                            <FileText className="w-3 h-3 mr-2" />
-                            Receipt
-                        </Button>
-                        <Link href={`/dashboard/savings/${vault.vaultAddress}?tab=${activeTab}`} className="flex-1">
+                    <div className="pt-3 border-t border-white/5">
+                        <Link href={`/dashboard/savings/${vault.vaultAddress}?tab=${activeTab}`} className="w-full">
                             <Button
                                 variant="ghost"
                                 size="sm"
@@ -139,20 +135,20 @@ function CompletedVaultCard({
 }
 
 // Keep the original VaultCard but update it for integration
-function VaultCard({ address, activeTab }: { address: `0x${string}`, activeTab: string }) {
-    const { data: purpose } = useReadContract({ address, abi: VAULT_ABI, functionName: "purpose" });
-    const { data: decimals } = useReadContract({ address: CONTRACTS.coston2.USDTToken, abi: ERC20_ABI, functionName: 'decimals' });
-    const { data: balanceResult } = useReadContract({ address, abi: VAULT_ABI, functionName: "totalAssets" });
-    const { data: unlockTimeResult } = useReadContract({ address, abi: VAULT_ABI, functionName: "unlockTimestamp" });
+function VaultCard({ address, activeTab }: { address: string, activeTab: string }) {
+    const { data: vaultChainData, loading: loadingChain } = useVaultData(address);
+    const { isFlare, isSolana } = useEcosystem();
 
     const [creationDate, setCreationDate] = useState<Date | null>(null);
     const [vaultData, setVaultData] = useState<SavedVault | null>(null);
-    const { address: userAddress } = useAccount();
 
-    const balance = balanceResult ? formatUnits(balanceResult, decimals || 18) : "0";
-    const unlockDate = unlockTimeResult ? new Date(Number(unlockTimeResult) * 1000) : new Date();
+    const currency = vaultChainData?.currency || (address.startsWith('0x') ? 'USDT0' : 'SHIP');
+    const decimals = vaultChainData?.decimals || (isFlare ? 6 : (currency === 'USDC' ? 6 : 9));
+    const balance = vaultChainData?.balance ? formatUnits(BigInt(vaultChainData.balance), decimals) : "0";
+    const unlockDate = vaultChainData?.unlockTimestamp ? new Date(vaultChainData.unlockTimestamp * 1000) : new Date();
     const isLocked = new Date() < unlockDate;
     const countdown = useCountdown(unlockDate);
+    const purpose = vaultChainData?.purpose || "Loading...";
 
     useEffect(() => {
         const fetchVaultData = async () => {
@@ -166,12 +162,12 @@ function VaultCard({ address, activeTab }: { address: `0x${string}`, activeTab: 
     }, [address]);
 
     const progressValue = useMemo(() => {
-        if (!vaultData?.targetAmount || !balanceResult || !decimals) return 0;
-        const current = parseFloat(formatUnits(balanceResult as bigint, decimals as number || 18));
+        if (!vaultData?.targetAmount || !vaultChainData?.balance) return 0;
+        const current = parseFloat(formatUnits(BigInt(vaultChainData.balance), decimals));
         const target = parseFloat(vaultData.targetAmount);
         if (target === 0) return 100;
         return Math.min(100, (current / target) * 100);
-    }, [vaultData, balanceResult, decimals]);
+    }, [vaultData, vaultChainData?.balance, decimals]);
 
     // Format countdown parts
     const formatCountdown = () => {
@@ -199,7 +195,7 @@ function VaultCard({ address, activeTab }: { address: `0x${string}`, activeTab: 
                         <div>
                             <div className="flex items-center gap-2 text-gray-500 text-xs mb-3">
                                 <Calendar className="w-3 h-3" />
-                                <span>Created: {creationDate ? creationDate.toLocaleDateString() : '...'}</span>
+                                <span>Created: {creationDate ? creationDate.toLocaleDateString() : (vaultChainData?.createdAt ? new Date(vaultChainData.createdAt).toLocaleDateString() : '...')}</span>
                             </div>
 
                             {isLocked ? (
@@ -235,7 +231,7 @@ function VaultCard({ address, activeTab }: { address: `0x${string}`, activeTab: 
                         <div className="pt-3 border-t border-white/5">
                             <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest mb-1">Total Savings</p>
                             <div className="text-2xl font-bold text-white flex items-baseline gap-1">
-                                {parseFloat(balance).toLocaleString()} <span className="text-[10px] font-normal text-zinc-500">USDT0</span>
+                                {parseFloat(balance).toLocaleString(undefined, { maximumFractionDigits: 2 })} <span className="text-sm font-normal text-zinc-500">{currency}</span>
                             </div>
                         </div>
                     </div>
@@ -256,8 +252,11 @@ export default function SavingsPage() {
 }
 
 function SavingsDashboard() {
-    const { address, isConnected } = useAccount();
+    const { isFlare, isSolana } = useEcosystem();
+    const { address, isConnected } = useEcosystemAccount();
+    const { vaults: unifiedVaults, loading: loadingVaults } = useVaults();
     const publicClient = usePublicClient();
+    const { connection } = useConnection();
     const router = useRouter();
     const searchParams = useSearchParams();
 
@@ -273,108 +272,106 @@ function SavingsDashboard() {
     }>({ active: [], matured: [], completed: [] });
 
     useEffect(() => {
-        const loadAndCategorizeVaults = async () => {
-            if (!address || !publicClient) return;
+        const categorize = async () => {
+            if (!isConnected || !address) return;
             setIsLoading(true);
+
+            const active: string[] = [];
+            const matured: string[] = [];
+            const completed: { vault: SavedVault, receipt?: Receipt }[] = [];
+
             try {
-                // 1. Get unique vault addresses from DB and Chain in parallel
-                const [dbVaults, rawChainVaults] = await Promise.all([
-                    getUserVaultsFromDb(address),
-                    publicClient.readContract({
-                        address: CONTRACTS.coston2.VaultFactory,
-                        abi: VAULT_FACTORY_ABI,
-                        functionName: "getUserVaults",
-                        args: [address]
-                    })
-                ]);
+                const { fetchVaultAccount } = await import("@/lib/anchor");
+                const { deriveVaultTokenAccount } = await import("@/lib/solana");
+                const { PublicKey: SolanaPubkey } = await import("@solana/web3.js");
 
-                const uniqueAddresses = Array.from(new Set([
-                    ...dbVaults.map(a => a.toLowerCase()),
-                    ...(rawChainVaults as string[]).map(a => a.toLowerCase())
-                ])) as `0x${string}`[];
-
-                if (uniqueAddresses.length === 0) {
-                    setAllVaultsData({ active: [], matured: [], completed: [] });
-                    return;
-                }
-
-                // 2. Fetch balance and status for each to categorize in parallel
-                // Note: Promise.all is used because Coston2 doesn't have multicall3 configured in viem
-                // but wagmiConfig transport handles batching naturally.
-                const results = await Promise.all(uniqueAddresses.map(async (vaddr) => {
+                // Process all unified vaults in parallel
+                await Promise.all(unifiedVaults.map(async (v) => {
                     try {
-                        const [balanceResult, unlockResult] = await Promise.all([
-                            publicClient.readContract({
-                                address: vaddr,
-                                abi: VAULT_ABI,
-                                functionName: "totalAssets"
-                            }),
-                            publicClient.readContract({
-                                address: vaddr,
-                                abi: VAULT_ABI,
-                                functionName: "unlockTimestamp"
-                            })
-                        ]);
-                        return { vaddr, balanceResult, unlockResult };
-                    } catch (e) {
-                        console.error(`Error checking vault ${vaddr}:`, e);
-                        return null;
+                        let balance = 0;
+                        let unlockTime = 0;
+
+                        if (v.chain === 'flare' && publicClient) {
+                            const [balanceResult, unlockResult] = await Promise.all([
+                                publicClient.readContract({
+                                    address: v.address as `0x${string}`,
+                                    abi: VAULT_ABI,
+                                    functionName: "totalAssets"
+                                }),
+                                publicClient.readContract({
+                                    address: v.address as `0x${string}`,
+                                    abi: VAULT_ABI,
+                                    functionName: "unlockTimestamp"
+                                })
+                            ]);
+                            balance = parseFloat(formatUnits(balanceResult as bigint, 6));
+                            unlockTime = Number(unlockResult) * 1000;
+                        }
+                        else if (v.chain === 'solana' && connection) {
+                            const vaultPubkey = new SolanaPubkey(v.address);
+                            const vaultAcc = await fetchVaultAccount(connection, vaultPubkey);
+                            if (vaultAcc) {
+                                unlockTime = vaultAcc.unlockTimestamp.toNumber() * 1000;
+
+                                // Get actual balance for Solana - use correct mint
+                                try {
+                                    const vaultTokenAccount = deriveVaultTokenAccount(vaultPubkey, vaultAcc.mint);
+                                    const tokenBalance = await connection.getTokenAccountBalance(vaultTokenAccount);
+                                    balance = parseFloat(tokenBalance.value.uiAmountString || "0");
+                                } catch (e) {
+                                    // Fallback to totalDeposited if token account fetch fails
+                                    balance = parseFloat(formatUnits(BigInt(vaultAcc.totalDeposited.toString()), vaultAcc.mint.equals(DEVNET_USDC_MINT) ? 6 : 9));
+                                }
+                            }
+                        }
+
+                        const isMatured = Date.now() >= unlockTime;
+
+                        if (balance > 0) {
+                            if (isMatured) matured.push(v.address);
+                            else active.push(v.address);
+                        } else {
+                            // Metadata for completed list
+                            const metadata = await getVaultByAddress(v.address);
+                            if (metadata) {
+                                const receipts = await getReceiptsByVault(v.address);
+                                const wr = receipts.find(r => r.type === 'completed' || r.type === 'breaked');
+                                completed.push({ vault: metadata, receipt: wr });
+                            }
+                        }
+                    } catch (err) {
+                        console.warn(`Failed to categorize vault ${v.address}:`, err);
                     }
                 }));
 
-                const active: string[] = [];
-                const matured: string[] = [];
-                const completedAddresses: string[] = [];
+                // Final deduplication for absolute safety
+                const uniqueActive = Array.from(new Set(active));
+                const uniqueMatured = Array.from(new Set(matured));
 
-                results.forEach((res) => {
-                    if (!res) return;
-                    const { vaddr, balanceResult, unlockResult } = res;
-
-                    const bal = parseFloat(formatUnits(balanceResult as bigint, 18));
-                    const unlockTime = Number(unlockResult) * 1000;
-                    const maturedStatus = Date.now() >= unlockTime;
-
-                    if (bal > 0) {
-                        if (maturedStatus) matured.push(vaddr);
-                        else active.push(vaddr);
-                    } else {
-                        completedAddresses.push(vaddr);
+                // Deduplicate completed by vault address
+                const uniqueCompleted: typeof completed = [];
+                const seenCompleted = new Set();
+                completed.forEach(item => {
+                    if (!seenCompleted.has(item.vault.vaultAddress.toLowerCase())) {
+                        seenCompleted.add(item.vault.vaultAddress.toLowerCase());
+                        uniqueCompleted.push(item);
                     }
                 });
 
-                // 3. Parallel fetch metadata and receipts for completed vaults
-                const [allReceipts, ...allMetadataResults] = await Promise.all([
-                    getReceiptsByWallet(address),
-                    ...completedAddresses.map(vaddr => getVaultByAddress(vaddr))
-                ]);
-
-                const indexedCompleted = completedAddresses.map((vaddr, i) => {
-                    const metadata = allMetadataResults[i];
-                    if (!metadata) return null;
-
-                    const withdrawReceipt = allReceipts.find(r =>
-                        r.vaultAddress?.toLowerCase() === vaddr.toLowerCase() &&
-                        (r.type === 'completed' || r.type === 'breaked')
-                    );
-
-                    return { vault: metadata, receipt: withdrawReceipt };
-                }).filter(Boolean);
-
                 setAllVaultsData({
-                    active,
-                    matured,
-                    completed: indexedCompleted as any
+                    active: uniqueActive,
+                    matured: uniqueMatured,
+                    completed: uniqueCompleted
                 });
-
-            } catch (error) {
-                console.error("Failed to load/categorize vaults:", error);
+            } catch (err) {
+                console.error("Categorization error:", err);
             } finally {
-                setIsLoading(false);
+                setIsLoading(loadingVaults);
             }
         };
 
-        loadAndCategorizeVaults();
-    }, [address, publicClient]);
+        categorize();
+    }, [isConnected, unifiedVaults, loadingVaults, address, publicClient, connection]);
 
     // Pagination Logic
     const currentItems = useMemo(() => {

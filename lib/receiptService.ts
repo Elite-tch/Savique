@@ -21,6 +21,8 @@ export interface Receipt {
     type: 'created' | 'breaked' | 'completed';
     penalty?: string;
     proofRailsId?: string;
+    currency?: string;
+    decimals?: number;
 }
 
 const RECEIPTS_COLLECTION = 'receipts';
@@ -63,10 +65,15 @@ export async function updateReceipt(id: string, updates: Partial<Receipt>): Prom
 export async function getReceiptsByWallet(walletAddress: string): Promise<Receipt[]> {
     try {
         const receiptsRef = collection(db, RECEIPTS_COLLECTION);
+        const addressToQuery = Array.from(new Set(
+            walletAddress.startsWith('0x')
+                ? [walletAddress.toLowerCase()]
+                : [walletAddress, walletAddress.toLowerCase()]
+        ));
+
         const q = query(
             receiptsRef,
-            where('walletAddress', '==', walletAddress.toLowerCase()),
-            orderBy('timestamp', 'desc')
+            where('walletAddress', 'in', addressToQuery)
         );
 
         const querySnapshot = await getDocs(q);
@@ -80,7 +87,8 @@ export async function getReceiptsByWallet(walletAddress: string): Promise<Receip
         });
 
         console.log(`[Firebase] Loaded ${receipts.length} receipts for wallet:`, walletAddress);
-        return receipts;
+        // Manual sort by timestamp desc
+        return receipts.sort((a, b) => b.timestamp - a.timestamp);
     } catch (error) {
         console.error('[Firebase] Error loading receipts:', error);
         throw error;
@@ -93,10 +101,15 @@ export async function getReceiptsByWallet(walletAddress: string): Promise<Receip
 export async function getReceiptsByVault(vaultAddress: string): Promise<Receipt[]> {
     try {
         const receiptsRef = collection(db, RECEIPTS_COLLECTION);
+        const addressToQuery = Array.from(new Set(
+            vaultAddress.startsWith('0x')
+                ? [vaultAddress.toLowerCase()]
+                : [vaultAddress, vaultAddress.toLowerCase()]
+        ));
+
         const q = query(
             receiptsRef,
-            where('vaultAddress', '==', vaultAddress.toLowerCase()),
-            orderBy('timestamp', 'desc')
+            where('vaultAddress', 'in', addressToQuery)
         );
 
         const querySnapshot = await getDocs(q);
@@ -109,7 +122,8 @@ export async function getReceiptsByVault(vaultAddress: string): Promise<Receipt[
             } as Receipt);
         });
 
-        return receipts;
+        // Manual sort by timestamp desc
+        return receipts.sort((a, b) => b.timestamp - a.timestamp);
     } catch (error) {
         console.error('[Firebase] Error loading receipts by vault:', error);
         throw error;
@@ -134,7 +148,7 @@ export async function migrateLocalStorageToFirestore(walletAddress: string): Pro
                         // Only migrate if it belongs to this wallet or has no wallet address
                         if (!parsed.walletAddress || parsed.walletAddress.toLowerCase() === walletAddress.toLowerCase()) {
                             await saveReceipt({
-                                walletAddress: walletAddress.toLowerCase(),
+                                walletAddress: walletAddress.startsWith('0x') ? walletAddress.toLowerCase() : walletAddress,
                                 txHash: parsed.txHash,
                                 timestamp: parsed.timestamp,
                                 purpose: parsed.purpose,
@@ -174,11 +188,13 @@ export interface SavedVault {
     purpose?: string;
     targetAmount?: string; // New: Sinking Fund Goal
     beneficiary?: string; // Emergency Beneficiary
+    currency?: string;
+    decimals?: number;
 }
 
 export async function saveVault(data: SavedVault): Promise<string> {
     try {
-        const normalizedAddress = data.vaultAddress.toLowerCase();
+        const normalizedAddress = data.vaultAddress.startsWith('0x') ? data.vaultAddress.toLowerCase() : data.vaultAddress;
         const vaultsRef = collection(db, VAULTS_COLLECTION);
         const q = query(vaultsRef, where('vaultAddress', '==', normalizedAddress));
         const snapshot = await getDocs(q);
@@ -216,7 +232,7 @@ export async function getUserVaultsFromDb(ownerAddress: string): Promise<string[
         const vaultsRef = collection(db, VAULTS_COLLECTION);
         const q = query(
             vaultsRef,
-            where('owner', '==', ownerAddress.toLowerCase()),
+            where('owner', '==', ownerAddress.startsWith('0x') ? ownerAddress.toLowerCase() : ownerAddress),
             orderBy('createdAt', 'desc')
         );
 
@@ -238,7 +254,7 @@ export async function getUserVaultsFromDb(ownerAddress: string): Promise<string[
 export async function getVaultByAddress(vaultAddress: string): Promise<SavedVault | null> {
     try {
         const vaultsRef = collection(db, VAULTS_COLLECTION);
-        const q = query(vaultsRef, where('vaultAddress', '==', vaultAddress.toLowerCase()));
+        const q = query(vaultsRef, where('vaultAddress', '==', vaultAddress.startsWith('0x') ? vaultAddress.toLowerCase() : vaultAddress));
         const snapshot = await getDocs(q);
 
         if (snapshot.empty) return null;
@@ -255,7 +271,9 @@ export async function getVaultByAddress(vaultAddress: string): Promise<SavedVaul
             factoryAddress: data.factoryAddress,
             createdAt: createdDay || Date.now(),
             purpose: data.purpose,
-            targetAmount: data.targetAmount // Retrieve target
+            targetAmount: data.targetAmount, // Retrieve target
+            currency: data.currency,
+            decimals: data.decimals
         };
     } catch (error) {
         console.error('Error fetching vault by address:', error);
@@ -290,7 +308,9 @@ export async function getAllVaults(): Promise<SavedVault[]> {
                 owner: data.owner,
                 factoryAddress: data.factoryAddress,
                 createdAt: created || Date.now(),
-                purpose: data.purpose
+                purpose: data.purpose,
+                currency: data.currency,
+                decimals: data.decimals
             });
         });
 

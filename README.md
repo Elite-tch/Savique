@@ -22,6 +22,30 @@ Savique provides a **Strategic Commitment Layer** for your capital. By moving be
 
 ---
 
+## 🏗️ Deep Technical Architecture 
+
+Savique is built on a modular, non-custodial smart contract framework designed for security, isolation, and verifiable state transitions.
+
+### 1. Contract Architecture (The Factory Pattern)
+To ensure maximum user security and isolation, Savique utilizes a **Factory Design Pattern**.
+*   **VaultFactory (`VaultFactory.sol`)**: Acts as the centralized registry and deployment engine. It keeps track of all `PersonalVault` instances via a `userVaults` mapping and manages protocol-wide parameters such as the `protocolTreasury` address.
+*   **PersonalVault (`PersonalVault.sol`)**: A standalone, non-custodial contract deployed for every user goal. This isolation prevents "pooling" risks and ensures that each vault’s security is independent of others.
+
+### 2. State Enforcement & Discipline (Solidity Logic)
+*   **Temporal Locking**: The `withdraw()` function is strictly gated by a `block.timestamp` check against the vault's `unlockTimestamp`. Any attempt to withdraw before this time will trigger an automatic revert unless routed through the `breakEarly` path.
+*   **Penalty Calculus (BPS)**: Early withdrawals are penalized using a **Basis Points (BPS)** precision system (e.g., 1000 BPS = 10%). The penalty is calculated on the `totalAssets()` and redirected to the `protocolTreasury` to disincentivize impulsive behavior.
+*   **Allowance-Based Auto-Deposits**: The `executeAutoDeposit` function in the Factory allows the protocol to pull funds from a user's wallet directly into their vault. This requires the user to grant a `spend` allowance to the Factory contract, mimicking a traditional direct debit system on-chain.
+
+### 3. Inheritance & Recovery Protocol
+*   **The Grace Period**: Every vault includes a `GRACE_PERIOD` constant (e.g., 90 days). 
+*   **Beneficiary Authority**: If a vault remains matures and untouched beyond the grace period, the `claimByBeneficiary()` function becomes active. This allows the designated beneficiary to claim the funds, preventing "lost capital" scenarios.
+
+### 4. Auditing & ProofRails Integration
+*   **Event-Driven Verification**: Every critical state change (Deposit, Break, Maturity) emits a standard Solidity event.
+*   **SDK Handshake**: The Savique middleware uses the **ProofRails SDK** to listen for these events and generate a cryptographically signed **Digital Receipt (PDF/JSON)**. These receipts are verifiable off-chain, turnings on-chain discipline into a "Financial Resume."
+
+---
+
 ## ✨ Premium Features (V2)
 
 ### 1. Sinking Fund Protocol (Goal Tracking)
@@ -34,19 +58,11 @@ Unlike static savings contracts, Savique allows you to "fuel" your goals. You ca
 The ultimate peace of mind. Users can designate an emergency beneficiary address. If the owner becomes inactive after the lock period ends, the protocol allows beneficiary to withdraw funds through safety and recovery way ensuring wealth is never lost to the void.
 
 ### 4. Professional Notification System
-Stay connected to your wealth. Savique integrates an automated notification system that sends:
-*   **Transaction Confirmations**: Instant receipts via email.
-*   **Maturity Alerts**: Notifications when your capital is ready for deployment.
-*   **Security Warnings**: Alerts for any unauthorized early withdrawal attempts.
-
-### 5. Financial Intelligence & TVL Dashboard
-A visual command center for tracking Total Value Locked (TVL) and wealth trajectories.
-*   **Proof of Reserves**: Real-time transparency of all capital secured by the protocol.
-*   **Audit Distribution**: Categorized view of all financial proofs and receipts.
+Integrated automated notification system that sends Transaction Confirmations, Maturity Alerts, and Security Warnings via email to keep the user connected to their wealth.
 
 ---
 
-## 🏗️ Technical Stack
+## 🛠️ Technical Stack
 
 *   **Network**: Flare Coston2 (Low-latency, high-security L1).
 *   **Verification**: ProofRails SDK for cryptographically signed financial statements.

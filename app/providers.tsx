@@ -21,6 +21,16 @@ import { http } from "viem";
 import { ProofRailsProvider } from "@proofrails/sdk/react";
 import { Toaster } from "sonner";
 import { AutoDisconnect } from "@/components/AutoDisconnect";
+import { EcosystemProvider } from "@/context/EcosystemContext";
+
+// Solana Imports
+import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
+import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
+import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets';
+import { clusterApiUrl } from '@solana/web3.js';
+
+// Default styles for Solana wallet adapter
+import '@solana/wallet-adapter-react-ui/styles.css';
 
 export const flare = defineChain({
     id: 14,
@@ -111,26 +121,43 @@ export const wagmiConfig = createConfig({
 
 const queryClient = new QueryClient();
 
+// Solana configuration defined outside to prevent re-creation on render
+// We leave this empty to allow the standard discovery to find installed wallets 
+// without creating duplicate 'MetaMask' keys with Wagmi/RainbowKit.
+const wallets: any[] = [];
+
 export default function Providers({ children }: { children: React.ReactNode }) {
+    // Solana endpoint
+    const network = 'devnet';
+    const endpoint = clusterApiUrl(network);
+
     return (
-        <WagmiProvider config={wagmiConfig}>
-            <QueryClientProvider client={queryClient}>
-                <RainbowKitProvider
-                    theme={darkTheme({
-                        accentColor: '#E62058',
-                        accentColorForeground: 'white',
-                        borderRadius: 'large',
-                        fontStack: 'system',
-                        overlayBlur: 'small',
-                    })}
-                >
-                    <ProofRailsProvider apiKey={process.env.NEXT_PUBLIC_PROOFRAILS_KEY || ""}>
-                        <AutoDisconnect />
-                        {children}
-                        <Toaster position="top-right" theme="dark" richColors closeButton />
-                    </ProofRailsProvider>
-                </RainbowKitProvider>
-            </QueryClientProvider>
-        </WagmiProvider>
+        <EcosystemProvider>
+            <WagmiProvider config={wagmiConfig}>
+                <QueryClientProvider client={queryClient}>
+                    <RainbowKitProvider
+                        theme={darkTheme({
+                            accentColor: '#E62058',
+                            accentColorForeground: 'white',
+                            borderRadius: 'large',
+                            fontStack: 'system',
+                            overlayBlur: 'small',
+                        })}
+                    >
+                        <ConnectionProvider endpoint={endpoint}>
+                            <WalletProvider wallets={wallets} autoConnect>
+                                <WalletModalProvider>
+                                    <ProofRailsProvider apiKey={process.env.NEXT_PUBLIC_PROOFRAILS_KEY || ""}>
+                                        <AutoDisconnect />
+                                        {children}
+                                        <Toaster position="top-right" theme="dark" richColors closeButton />
+                                    </ProofRailsProvider>
+                                </WalletModalProvider>
+                            </WalletProvider>
+                        </ConnectionProvider>
+                    </RainbowKitProvider>
+                </QueryClientProvider>
+            </WagmiProvider>
+        </EcosystemProvider>
     );
 }

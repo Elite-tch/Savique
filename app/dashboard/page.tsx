@@ -8,12 +8,18 @@ import { motion } from "framer-motion";
 import { useAccount, useReadContract, useReadContracts } from "wagmi";
 import { formatUnits } from "viem";
 import { CONTRACTS, VAULT_FACTORY_ABI, VAULT_ABI, ERC20_ABI } from "@/lib/contracts";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { VaultPreviewCard } from "@/components/VaultPreviewCard";
 import { useContractAddresses } from "@/hooks/useContractAddresses";
 import { Input } from "@/components/ui/input";
 import { getUserVaultsFromDb, saveVault } from "@/lib/receiptService";
 import { usePublicClient } from "wagmi";
+import { useEcosystemAccount } from "@/hooks/useEcosystemAccount";
+import { useEcosystem } from "@/context/EcosystemContext";
+import { useVaults } from "@/hooks/useVaults";
+import { useConnection } from "@solana/wallet-adapter-react";
+import { PublicKey } from "@solana/web3.js";
+import { DEVNET_SHIP_MINT, DEVNET_USDC_MINT } from "@/lib/solana";
 
 
 function StatCard({ stat }: { stat: any }) {
@@ -49,10 +55,14 @@ function StatCard({ stat }: { stat: any }) {
 }
 
 export default function Dashboard() {
-    const { address, isConnected, isConnecting, isReconnecting } = useAccount();
+    const { address, isConnected } = useEcosystemAccount();
+    const { isFlare, isSolana } = useEcosystem();
     const { usdtAddress, factoryAddress, updateUsdtAddress, resetDefaults, isLoaded } = useContractAddresses();
     const [inputAddress, setInputAddress] = useState("");
-    const [totalLocked, setTotalLocked] = useState("0.00");
+    const [solanaShipBalance, setSolanaShipBalance] = useState<string | null>(null);
+    const [solanaUsdcBalance, setSolanaUsdcBalance] = useState<string | null>(null);
+    const [dashboardToken, setDashboardToken] = useState<"SHIP" | "USDC">("USDC");
+    const { connection } = useConnection();
 
     // USDT Balance
     const { data: balance, isLoading, isError, error } = useReadContract({
@@ -61,7 +71,7 @@ export default function Dashboard() {
         functionName: 'balanceOf',
         args: [address as `0x${string}`],
         query: {
-            enabled: !!address && isLoaded,
+            enabled: !!address && isLoaded && isFlare,
         }
     });
 
@@ -76,63 +86,46 @@ export default function Dashboard() {
         console.error("USDT Balance Error:", error);
     }
 
-    // Get user's vaults
-    const [vaultAddresses, setVaultAddresses] = useState<string[] | undefined>(undefined);
-    const [loadingVaults, setLoadingVaults] = useState(true);
-
-    const publicClient = usePublicClient();
-
-    // Get user's vaults using Hybrid Sync (DB + Chain)
+    // Fetch SHIP & USDC balances on Solana
     useEffect(() => {
-        const fetchVaults = async () => {
-            if (address && publicClient && factoryAddress) {
-                try {
-                    // 1. Get DB Vaults
-                    const dbVaults = await getUserVaultsFromDb(address);
+        if (!isSolana || !address || !connection) return;
+        const fetchBalances = async () => {
+            try {
+                const ownerPubkey = new PublicKey(address);
 
-                    // 2. Get Chain Vaults
-                    let chainVaults: string[] = [];
-                    try {
-                        const rawChainVaults = await publicClient.readContract({
-                            address: factoryAddress,
-                            abi: VAULT_FACTORY_ABI,
-                            functionName: "getUserVaults",
-                            args: [address]
-                        });
-                        chainVaults = [...rawChainVaults].reverse();
-                    } catch (err) {
-                        console.warn("Failed to fetch chain vaults", err);
-                    }
-
-                    // 3. Merge
-                    const uniqueVaults = Array.from(new Set([...dbVaults, ...chainVaults]));
-                    setVaultAddresses(uniqueVaults);
-
-                    // 4. Backfill (Fire & Forget)
-                    const missingInDb = chainVaults.filter(v => !dbVaults.includes(v));
-                    if (missingInDb.length > 0) {
-                        missingInDb.forEach(async (vault) => {
-                            await saveVault({
-                                vaultAddress: vault,
-                                owner: address.toLowerCase(),
-                                factoryAddress: factoryAddress,
-                                createdAt: Date.now(),
-                                purpose: "Imported Savings"
-                            });
-                        });
-                    }
-
-                } catch (e) {
-                    console.error("Failed to load vaults", e);
-                } finally {
-                    setLoadingVaults(false);
+                // Fetch SHIP balance
+                const shipAccounts = await connection.getParsedTokenAccountsByOwner(
+                    ownerPubkey,
+                    { mint: DEVNET_SHIP_MINT }
+                );
+                if (shipAccounts.value.length > 0) {
+                    setSolanaShipBalance(shipAccounts.value[0].account.data.parsed.info.tokenAmount.uiAmountString);
+                } else {
+                    setSolanaShipBalance("0");
                 }
-            } else {
-                setLoadingVaults(false);
+
+                // Fetch USDC balance
+                const usdcAccounts = await connection.getParsedTokenAccountsByOwner(
+                    ownerPubkey,
+                    { mint: DEVNET_USDC_MINT }
+                );
+                if (usdcAccounts.value.length > 0) {
+                    setSolanaUsdcBalance(usdcAccounts.value[0].account.data.parsed.info.tokenAmount.uiAmountString);
+                } else {
+                    setSolanaUsdcBalance("0");
+                }
+            } catch (err) {
+                console.error("Failed to fetch Solana balances:", err);
+                setSolanaShipBalance("---");
+                setSolanaUsdcBalance("---");
             }
         };
-        fetchVaults();
-    }, [address, publicClient, factoryAddress]);
+        fetchBalances();
+    }, [isSolana, address, connection]);
+
+    // Get user's vaults using Unified Hook (Flare + Solana)
+    const { vaults: unifiedVaults, loading: loadingVaults } = useVaults();
+    const vaultAddresses = useMemo(() => unifiedVaults.map(v => v.address), [unifiedVaults]);
 
     const vaultCount = vaultAddresses?.length || 0;
 
@@ -146,7 +139,7 @@ export default function Dashboard() {
     const { data: vaultBalances, isLoading: isBalancesLoading } = useReadContracts({
         contracts: vaultBalanceContracts,
         query: {
-            enabled: vaultCount > 0
+            enabled: vaultCount > 0 && isFlare
         }
     });
 
@@ -160,7 +153,7 @@ export default function Dashboard() {
     const { data: unlockTimestamps } = useReadContracts({
         contracts: vaultUnlockContracts,
         query: {
-            enabled: vaultCount > 0
+            enabled: vaultCount > 0 && isFlare
         }
     });
 
@@ -174,78 +167,104 @@ export default function Dashboard() {
     }).length;
 
     // Derived active list for Recent Vaults
-    const activeVaultList = (vaultAddresses || []).filter((_, index) => {
-        const res = vaultBalances?.[index];
-        if (res?.status === 'success' && res.result) {
-            return (res.result as bigint) > BigInt(0);
+    const activeVaultList = useMemo(() => {
+        if (isFlare) {
+            return (vaultAddresses || []).filter((_, index) => {
+                const res = vaultBalances?.[index];
+                if (res?.status === 'success' && res.result) {
+                    return (res.result as bigint) > BigInt(0);
+                }
+                return false;
+            });
         }
-        return false;
-    });
+        // For Solana: show all active vaults regardless of token, sorted newest first
+        return unifiedVaults
+            .filter(v => v.isActive && v.balance && v.balance !== "0")
+            .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+            .map(v => v.address);
+    }, [isFlare, vaultAddresses, vaultBalances, unifiedVaults, dashboardToken]);
 
-    const recentActiveVaults = [...activeVaultList].slice(0, 3);
+    const recentActiveVaults = useMemo(() => [...activeVaultList].slice(0, 3), [activeVaultList]);
 
     // Calculate Active and Completed vaults based on balance
-    let activeVaultCount = 0;
 
-    // Calculate total locked and active count
-    useEffect(() => {
-        if (!vaultBalances || vaultBalances.length === 0) {
-            setTotalLocked("0.00");
-            return;
+    // Calculate total locked value via memo for absolute sync
+    const totalLockedValue = useMemo(() => {
+        if (isFlare) {
+            if (!vaultBalances || vaultBalances.length === 0) return "0.00";
+            let total = BigInt(0);
+            vaultBalances.forEach((result) => {
+                if (result.status === 'success' && result.result) {
+                    total += result.result as bigint;
+                }
+            });
+            return parseFloat(formatUnits(total, decimals || 18)).toFixed(2);
+        } else if (isSolana) {
+            if (!unifiedVaults || unifiedVaults.length === 0) return "0.00";
+            let totalNum = 0;
+            unifiedVaults.forEach((v) => {
+                if (v.balance && (v.currency === dashboardToken)) {
+                    const vaultDecimals = v.decimals || (dashboardToken === 'SHIP' ? 9 : 6);
+                    const formatted = parseFloat(formatUnits(BigInt(v.balance), vaultDecimals));
+                    totalNum += formatted;
+                }
+            });
+            return totalNum.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
+        return "0.00";
+    }, [isFlare, isSolana, vaultBalances, unifiedVaults, decimals, dashboardToken]);
 
-        let total = BigInt(0);
-        let active = 0;
-
-        vaultBalances.forEach((result) => {
+    const activeInfo = useMemo(() => {
+        return (vaultBalances || []).reduce((acc, result) => {
             if (result.status === 'success' && result.result) {
-                const bal = result.result as bigint;
-                total += bal;
-                if (bal > BigInt(0)) active++;
+                if ((result.result as bigint) > BigInt(0)) {
+                    return acc + 1;
+                }
             }
-        });
+            return acc;
+        }, 0);
+    }, [vaultBalances]);
 
-        setTotalLocked(parseFloat(formatUnits(total, decimals || 18)).toFixed(2));
-        // We can't update a local variable 'activeVaultCount' here to trigger re-render of stats, 
-        // so we need a state or calculate it in render body if possible.
-        // Actually, since vaultBalances is data, we can calculate derived state in render body.
-    }, [vaultBalances, decimals]);
+    // Unified calculation
+    const activeVaultCount = useMemo(() => {
+        if (isFlare) return vaultBalances ? activeInfo : 0;
+        if (isSolana) return unifiedVaults.filter(v => v.isActive && v.currency === dashboardToken).length;
+        return 0;
+    }, [isFlare, isSolana, activeInfo, unifiedVaults, dashboardToken]);
 
-    // Derived state calculation from data
-    const activeInfo = (vaultBalances || []).reduce((acc, result) => {
-        if (result.status === 'success' && result.result) {
-            if ((result.result as bigint) > BigInt(0)) {
-                return acc + 1;
-            }
-        }
-        return acc;
-    }, 0);
+    const calculatedCompletedCount = useMemo(() => {
+        if (isFlare) return (vaultAddresses?.length || 0) - (vaultBalances ? activeInfo : 0);
+        if (isSolana) return unifiedVaults.filter(v => !v.isActive && v.currency === dashboardToken).length;
+        return 0;
+    }, [isFlare, vaultAddresses, vaultBalances, activeInfo, isSolana, unifiedVaults, dashboardToken]);
 
-    const calculatedActiveCount = vaultBalances ? activeInfo : 0;
-    const calculatedCompletedCount = (vaultAddresses?.length || 0) - calculatedActiveCount;
-
+    // Derived logic cleanup
     const formattedBalance = isConnected && balance
         ? parseFloat(formatUnits(balance as bigint, decimals || 18)).toFixed(2)
         : "---";
 
+    const displayBalance = isSolana
+        ? (dashboardToken === 'SHIP' ? solanaShipBalance : solanaUsdcBalance) || "..."
+        : formattedBalance;
+
     const stats = [
         {
-            label: "USDT0 Balance",
-            value: isLoading ? "Loading..." : isError ? "Error" : `${formattedBalance} USDT0`,
+            label: isFlare ? "USDT0 Balance" : (dashboardToken === 'SHIP' ? "SHIP Balance" : "USDC Balance"),
+            value: (isLoading && isFlare) ? "Loading..." : (isError && isFlare) ? "Error" : `${displayBalance} ${isFlare ? 'USDT0' : dashboardToken}`,
             icon: Wallet,
             color: "text-green-400",
             isPrivacy: true
         },
         {
             label: "Active Savings",
-            value: calculatedActiveCount.toString(),
+            value: activeVaultCount.toString(),
             icon: Lock,
             color: "text-primary",
             isPrivacy: false
         },
         {
             label: "Total Locked",
-            value: `$ ${totalLocked} `,
+            value: isFlare ? `$ ${totalLockedValue}` : `${totalLockedValue} ${dashboardToken}`,
             icon: TrendingUp,
             color: "text-purple-400",
             isPrivacy: true
@@ -275,11 +294,30 @@ export default function Dashboard() {
 
     return (
         <div className="space-y-8">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-white">Dashboard Overview</h1>
                     <p className="text-gray-400 mt-1">Snapshot of your wealth and Savings activity.</p>
                 </div>
+                {isSolana && (
+                    <div className="flex bg-zinc-900 border border-zinc-800 p-1 rounded-xl h-11">
+                        {(['SHIP', 'USDC'] as const).map((t) => (
+                            <button
+                                key={t}
+                                onClick={() => setDashboardToken(t)}
+                                className={`px-4 py-1.5 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-2 ${dashboardToken === t
+                                    ? 'bg-primary text-white shadow-lg'
+                                    : 'text-gray-500 hover:text-gray-300'
+                                    }`}
+                            >
+                                <div className="w-5 h-5 rounded-full overflow-hidden shrink-0 border border-white/5">
+                                    <img src={t === 'SHIP' ? '/ship.png' : '/usdc.png'} alt={t} className="w-full h-full object-cover" />
+                                </div>
+                                {t}
+                            </button>
+                        ))}
+                    </div>
+                )}
             </div>
 
             {/* Stats Row */}
@@ -300,12 +338,12 @@ export default function Dashboard() {
             <div className="flex justify-between md:flex-row flex-col gap-3 md:items-center">
                 <h2 className="text-2xl font-bold text-white">Recent Savings</h2>
                 <div className="flex md:flex-row flex-col gap-4 md:items-center">
-                   <div className=" flex justify-end"> 
-                    <Link href="/dashboard/savings">
-                        <Button variant="ghost" className="text-gray-400 hover:text-white">
-                            View All
-                        </Button>
-                    </Link>
+                    <div className=" flex justify-end">
+                        <Link href="/dashboard/savings">
+                            <Button variant="ghost" className="text-gray-400 hover:text-white">
+                                View All
+                            </Button>
+                        </Link>
                     </div>
                     <Link href="/dashboard/create">
                         <Button className="gap-2 bg-primary text-white hover:bg-primary/90">
@@ -317,7 +355,7 @@ export default function Dashboard() {
 
             {/* Vaults Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {isBalancesLoading ? (
+                {(isBalancesLoading || loadingVaults) ? (
                     [1, 2, 3].map((i) => (
                         <Card key={i} className="h-64 animate-pulse bg-white/5 border-transparent">
                             <div className="w-full h-full" />
@@ -328,9 +366,9 @@ export default function Dashboard() {
                         <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-4">
                             <Lock className="w-8 h-8 text-gray-500" />
                         </div>
-                        <h3 className="text-lg font-medium text-white">No Active Savings</h3>
+                        <h3 className="text-lg font-medium text-white">No Savings Found</h3>
                         <p className="text-gray-400 mb-6 max-w-sm">
-                            You don't have any active savings plans yet. Start by creating a personal savings.
+                            You don't have any active savings yet. Start by creating your first savings plan.
                         </p>
                         <Link href="/dashboard/create">
                             <Button variant="outline" className="border-white/20 hover:bg-white/10">Get Started</Button>

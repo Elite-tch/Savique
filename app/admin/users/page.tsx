@@ -12,6 +12,7 @@ import {
     ChevronRight
 } from "lucide-react";
 import { toast } from "sonner";
+import { useAdminEcosystem } from "../AdminEcosystemContext";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -21,6 +22,8 @@ export default function UsersPage() {
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
+
+    const { ecosystem } = useAdminEcosystem();
 
     useEffect(() => {
         const load = async () => {
@@ -37,24 +40,39 @@ export default function UsersPage() {
         load();
     }, []);
 
+    // Reset pagination on ecosystem change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [ecosystem]);
+
     const usersList = useMemo(() => {
+        // First filter raw data by ecosystem
+        const filteredVaults = ecosystem === 'all' ? vaults :
+            ecosystem === 'flare' ? vaults.filter(v => v.vaultAddress.startsWith('0x')) :
+                vaults.filter(v => !v.vaultAddress.startsWith('0x'));
+
+        const filteredReceipts = ecosystem === 'all' ? receipts :
+            ecosystem === 'flare' ? receipts.filter(r => r.walletAddress.startsWith('0x')) :
+                receipts.filter(r => !r.walletAddress.startsWith('0x'));
+
         const usersMap = new Map();
-        vaults.forEach(v => {
+        filteredVaults.forEach(v => {
             const addr = v.owner.toLowerCase();
             if (!usersMap.has(addr)) {
-                const userReceipts = receipts.filter(r => r.walletAddress.toLowerCase() === addr);
+                const userReceipts = filteredReceipts.filter(r => r.walletAddress.toLowerCase() === addr);
                 usersMap.set(addr, {
                     address: v.owner,
-                    vaultCount: vaults.filter(v2 => v2.owner.toLowerCase() === addr).length,
+                    vaultCount: filteredVaults.filter(v2 => v2.owner.toLowerCase() === addr).length,
                     totalSaved: userReceipts.filter(r => r.type === 'created').reduce((acc, r) => acc + parseFloat(r.amount), 0),
-                    lastActive: v.createdAt
+                    lastActive: v.createdAt,
+                    isSolana: !v.owner.startsWith('0x')
                 });
             }
         });
         return Array.from(usersMap.values())
             .filter(u => u.address.toLowerCase().includes(searchQuery.toLowerCase()))
             .sort((a, b) => b.totalSaved - a.totalSaved);
-    }, [vaults, receipts, searchQuery]);
+    }, [vaults, receipts, searchQuery, ecosystem]);
 
     const paginatedUsers = usersList.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
     const totalPages = Math.ceil(usersList.length / ITEMS_PER_PAGE);
@@ -100,9 +118,18 @@ export default function UsersPage() {
                             ) : paginatedUsers.length > 0 ? (
                                 paginatedUsers.map((user, idx) => (
                                     <tr key={idx} className="hover:bg-white/5 transition-colors">
-                                        <td className="px-6 py-4 font-mono text-gray-400">{user.address}</td>
+                                        <td className="px-6 py-4 font-mono text-gray-400">
+                                            <div className="flex items-center gap-2">
+                                                {user.address}
+                                                <span className={`text-[8px] font-bold px-1 py-0.5 rounded ${user.isSolana ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' : 'bg-orange-500/10 text-orange-400 border border-orange-500/20'}`}>
+                                                    {user.isSolana ? 'SOL' : 'FLR'}
+                                                </span>
+                                            </div>
+                                        </td>
                                         <td className="px-6 py-4">{user.vaultCount}</td>
-                                        <td className="px-6 py-4 text-right font-bold text-emerald-500">{user.totalSaved.toFixed(2)}</td>
+                                        <td className="px-6 py-4 text-right font-bold text-emerald-500">
+                                            {user.totalSaved.toFixed(2)} <span className="text-[10px] text-gray-500 ml-1 font-normal">{user.isSolana ? 'SHIP' : 'USDT'}</span>
+                                        </td>
                                         <td className="px-6 py-4 text-right text-gray-500">{new Date(user.lastActive).toLocaleDateString()}</td>
                                     </tr>
                                 ))

@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { generateStatement } from "@/lib/statementGenerator";
 import { toast } from "sonner";
+import { useAdminEcosystem } from "../AdminEcosystemContext";
 
 const ITEMS_PER_PAGE = 8;
 
@@ -23,6 +24,8 @@ export default function BrokenSavingsPage() {
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
+
+    const { ecosystem } = useAdminEcosystem();
 
     useEffect(() => {
         const load = async () => {
@@ -38,13 +41,22 @@ export default function BrokenSavingsPage() {
         load();
     }, []);
 
+    // Reset pagination on ecosystem change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [ecosystem]);
+
     const filteredList = useMemo(() => {
-        return receipts.filter(r =>
+        const baseFiltered = ecosystem === 'all' ? receipts :
+            ecosystem === 'flare' ? receipts.filter(r => r.walletAddress.startsWith('0x')) :
+                receipts.filter(r => !r.walletAddress.startsWith('0x'));
+
+        return baseFiltered.filter(r =>
             r.walletAddress.toLowerCase().includes(searchQuery.toLowerCase()) ||
             r.purpose?.toLowerCase().includes(searchQuery.toLowerCase()) ||
             r.txHash.toLowerCase().includes(searchQuery.toLowerCase())
         ).sort((a, b) => b.timestamp - a.timestamp);
-    }, [receipts, searchQuery]);
+    }, [receipts, searchQuery, ecosystem]);
 
     const paginatedList = filteredList.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
     const totalPages = Math.ceil(filteredList.length / ITEMS_PER_PAGE);
@@ -131,24 +143,31 @@ export default function BrokenSavingsPage() {
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-2">
                                                 <XCircle size={12} className="text-red-500" />
-                                                <span className="font-medium text-white">{receipt.purpose}</span>
+                                                <div className="flex flex-col">
+                                                    <span className="font-medium text-white">{receipt.purpose}</span>
+                                                    <span className={`text-[8px] font-bold w-fit mt-1 px-1.5 py-0.5 rounded border ${!receipt.walletAddress.startsWith('0x') ? 'border-indigo-500/30 text-indigo-400 bg-indigo-500/10' : 'border-orange-500/30 text-orange-400 bg-orange-500/10'}`}>
+                                                        {!receipt.walletAddress.startsWith('0x') ? 'SOLANA' : 'FLARE'}
+                                                    </span>
+                                                </div>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4 font-mono text-gray-500 text-xs">{receipt.walletAddress}</td>
+                                        <td className="px-6 py-4 font-mono text-gray-500 text-xs truncate max-w-[150px]">{receipt.walletAddress}</td>
                                         <td className="px-6 py-4 text-right font-bold text-white">
-                                            {parseFloat(receipt.amount).toFixed(2)} USDT
+                                            {parseFloat(receipt.amount).toFixed(2)} {!receipt.walletAddress.startsWith('0x') ? (receipt.currency || 'SHIP') : 'USDT'}
                                         </td>
                                         <td className="px-6 py-4 text-right font-bold text-red-500">
-                                            -{parseFloat(receipt.penalty || "0").toFixed(2)} USDT
+                                            -{parseFloat(receipt.penalty || "0").toFixed(2)} {!receipt.walletAddress.startsWith('0x') ? (receipt.currency || 'SHIP') : 'USDT'}
                                         </td>
                                         <td className="px-6 py-4 text-right">
                                             <div className="flex justify-end gap-2 text-[10px]">
-                                                <Button variant="ghost" size="sm" className="h-7 gap-1" onClick={() => window.open(`https://coston2-explorer.flare.network/tx/${receipt.txHash}`, '_blank')}>
+                                                <Button variant="ghost" size="sm" className="h-7 gap-1" onClick={() => window.open(!receipt.walletAddress.startsWith('0x') ? `https://explorer.solana.com/tx/${receipt.txHash}?cluster=devnet` : `https://coston2-explorer.flare.network/tx/${receipt.txHash}`, '_blank')}>
                                                     <ExternalLink size={12} /> TX
                                                 </Button>
-                                                <Button variant="ghost" size="sm" className="h-7 gap-1 text-red-400" onClick={() => handleExportReceipt(receipt)}>
-                                                    <FileText size={12} /> PDF
-                                                </Button>
+                                                {receipt.walletAddress.startsWith('0x') && (
+                                                    <Button variant="ghost" size="sm" className="h-7 gap-1 text-red-400" onClick={() => handleExportReceipt(receipt)}>
+                                                        <FileText size={12} /> PDF
+                                                    </Button>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>

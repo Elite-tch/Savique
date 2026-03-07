@@ -33,6 +33,10 @@ import {
     Tooltip,
     ResponsiveContainer,
 } from "recharts";
+import { useAdminEcosystem } from "../AdminEcosystemContext";
+import { DEVNET_SHIP_MINT, DEVNET_USDC_MINT } from "@/lib/solana";
+import { getAssociatedTokenAddressSync } from "@solana/spl-token";
+import { Connection, PublicKey as SolanaPubkey } from "@solana/web3.js";
 
 const formatUSD = (val: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -49,8 +53,10 @@ export default function AdminDashboard() {
     const [loading, setLoading] = useState(true);
     const [tvl, setTvl] = useState(0);
     const [refreshing, setRefreshing] = useState(false);
+    const [adminToken, setAdminToken] = useState<'SHIP' | 'USDC'>('SHIP');
 
     const publicClient = usePublicClient();
+    const { ecosystem } = useAdminEcosystem();
 
     const loadData = async () => {
         setRefreshing(true);
@@ -63,11 +69,15 @@ export default function AdminDashboard() {
             setVaults(allVaults);
             setReceipts(allReceipts);
 
-            if (publicClient) {
-                let currentTvl = 0;
+            let flareTvl = 0;
+            let solanaTvl = 0;
+
+            // 1. Calculate Flare TVL
+            const flareVaults = allVaults.filter(v => v.vaultAddress.startsWith('0x'));
+            if (publicClient && flareVaults.length > 0) {
                 const chunkSize = 20;
-                for (let i = 0; i < allVaults.length; i += chunkSize) {
-                    const chunk = allVaults.slice(i, i + chunkSize);
+                for (let i = 0; i < flareVaults.length; i += chunkSize) {
+                    const chunk = flareVaults.slice(i, i + chunkSize);
                     const balances = await Promise.all(
                         chunk.map(async (v) => {
                             try {
@@ -82,10 +92,47 @@ export default function AdminDashboard() {
                             }
                         })
                     );
-                    currentTvl += balances.reduce((a, b) => a + b, 0);
+                    flareTvl += balances.reduce((a, b) => a + b, 0);
                 }
-                setTvl(currentTvl);
             }
+
+            // 2. Calculate Solana TVL
+            const solanaVaults = allVaults.filter(v => v.vaultAddress && !v.vaultAddress.startsWith('0x'));
+            if (solanaVaults.length > 0) {
+                try {
+                    const connection = new Connection("https://api.devnet.solana.com");
+                    const solanaBalances = await Promise.all(
+                        solanaVaults.map(async (v) => {
+                            try {
+                                if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(v.vaultAddress)) return 0;
+
+                                const vaultPubkey = new SolanaPubkey(v.vaultAddress);
+                                const isUsdc = v.currency === 'USDC' || (adminToken === 'USDC' && !v.currency);
+                                const mint = isUsdc ? DEVNET_USDC_MINT : DEVNET_SHIP_MINT;
+
+                                const vaultTokenAccount = getAssociatedTokenAddressSync(
+                                    mint,
+                                    vaultPubkey,
+                                    true
+                                );
+                                const bal = await connection.getTokenAccountBalance(vaultTokenAccount);
+                                return bal.value.uiAmount || 0;
+                            } catch (e) {
+                                return 0;
+                            }
+                        })
+                    );
+                    solanaTvl = solanaBalances.reduce((a, b) => a + b, 0);
+                } catch (solErr) {
+                    console.error("Solana TVL error:", solErr);
+                }
+            }
+
+            // Filter context aware TVL
+            if (ecosystem === 'flare') setTvl(flareTvl);
+            else if (ecosystem === 'solana') setTvl(solanaTvl);
+            else setTvl(flareTvl + solanaTvl);
+
         } catch (error) {
             console.error("Admin Load Error", error);
         } finally {
@@ -96,21 +143,34 @@ export default function AdminDashboard() {
 
     useEffect(() => {
         loadData();
-    }, [publicClient]);
+    }, [publicClient, ecosystem, adminToken]);
 
-    const activeVaults = vaults.filter(v => {
-        const isClosed = receipts.some(r => r.vaultAddress === v.vaultAddress && (r.type === 'breaked' || r.type === 'completed'));
+    // Filter data based on current ecosystem context
+    const filteredVaults = useMemo(() => {
+        if (ecosystem === 'all') return vaults;
+        if (ecosystem === 'flare') return vaults.filter(v => v.vaultAddress.startsWith('0x'));
+        return vaults.filter(v => !v.vaultAddress.startsWith('0x'));
+    }, [vaults, ecosystem]);
+
+    const filteredReceipts = useMemo(() => {
+        if (ecosystem === 'all') return receipts;
+        if (ecosystem === 'flare') return receipts.filter(r => r.walletAddress.startsWith('0x'));
+        return receipts.filter(r => !r.walletAddress.startsWith('0x'));
+    }, [receipts, ecosystem]);
+
+    const activeVaults = filteredVaults.filter(v => {
+        const isClosed = filteredReceipts.some(r => r.vaultAddress === v.vaultAddress && (r.type === 'breaked' || r.type === 'completed'));
         return !isClosed;
     });
 
     const stats = {
         tvl: tvl,
-        users: new Set(vaults.map(v => v.owner.toLowerCase())).size,
+        users: new Set(filteredVaults.map(v => v.owner.toLowerCase())).size,
         active: activeVaults.length,
-        broken: receipts.filter(r => r.type === 'breaked').length,
-        completed: receipts.filter(r => r.type === 'completed').length,
-        revenue: receipts.filter(r => r.type === 'breaked').reduce((acc, r) => acc + parseFloat(r.penalty || "0"), 0),
-        cumulative: receipts.filter(r => r.type === 'created').reduce((acc, r) => acc + parseFloat(r.amount), 0)
+        broken: filteredReceipts.filter(r => r.type === 'breaked').length,
+        completed: filteredReceipts.filter(r => r.type === 'completed').length,
+        revenue: filteredReceipts.filter(r => r.type === 'breaked').reduce((acc, r) => acc + parseFloat(r.penalty || "0"), 0),
+        cumulative: filteredReceipts.filter(r => r.type === 'created').reduce((acc, r) => acc + parseFloat(r.amount), 0)
     };
 
     // Prepare chart data for last 7 days
@@ -121,7 +181,7 @@ export default function AdminDashboard() {
             date.setDate(date.getDate() - i);
             const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
-            const dayReceipts = receipts.filter(r => {
+            const dayReceipts = filteredReceipts.filter(r => {
                 const rDate = new Date(r.timestamp);
                 return rDate.toDateString() === date.toDateString();
             });
@@ -141,7 +201,7 @@ export default function AdminDashboard() {
             });
         }
         return days;
-    }, [receipts]);
+    }, [filteredReceipts]);
     const handleExportReceipt = (receipt: Receipt) => {
         const toastId = toast.loading("Preparing verified receipt...");
 
@@ -193,6 +253,23 @@ export default function AdminDashboard() {
                 </Button>
             </header>
 
+            {ecosystem === 'solana' && (
+                <div className="flex bg-white/5 p-1 rounded-xl border border-white/10 w-fit">
+                    {(['SHIP', 'USDC'] as const).map((t) => (
+                        <button
+                            key={t}
+                            onClick={() => setAdminToken(t)}
+                            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${adminToken === t ? 'bg-primary text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}
+                        >
+                            <div className="w-5 h-5 rounded-full overflow-hidden shrink-0 border border-white/5 bg-zinc-800">
+                                <img src={t === 'SHIP' ? '/ship.png' : '/usdc.png'} alt={t} className="w-full h-full object-cover" />
+                            </div>
+                            {t} View
+                        </button>
+                    ))}
+                </div>
+            )}
+
             {/* KPI Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <KPICard title="Cumulative Volume" value={formatUSD(stats.cumulative)} icon={<Wallet className="text-blue-500" />} />
@@ -214,46 +291,56 @@ export default function AdminDashboard() {
                     </div>
 
                     <div className="space-y-4 max-h-[400px] overflow-y-auto no-scrollbar pr-2">
-                        {receipts.length > 0 ? (
-                            receipts.slice(0, 10).map((r, i) => (
-                                <div key={i} className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5 hover:border-white/10 transition-colors">
-                                    <div className="flex items-center gap-4">
-                                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${r.type === 'breaked' ? 'bg-red-500/10 text-red-500' : r.type === 'created' ? 'bg-blue-500/10 text-blue-500' : 'bg-emerald-500/10 text-emerald-500'}`}>
-                                            {r.type === 'breaked' ? <XCircle size={18} /> : r.type === 'created' ? <Activity size={18} /> : <CheckCircle2 size={18} />}
+                        {filteredReceipts.length > 0 ? (
+                            filteredReceipts.slice(0, 10).map((r, i) => {
+                                const isSolanaTx = !r.walletAddress.startsWith('0x');
+                                return (
+                                    <div key={i} className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5 hover:border-white/10 transition-colors">
+                                        <div className="flex items-center gap-4">
+                                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${r.type === 'breaked' ? 'bg-red-500/10 text-red-500' : r.type === 'created' ? 'bg-blue-500/10 text-blue-500' : 'bg-emerald-500/10 text-emerald-500'}`}>
+                                                {r.type === 'breaked' ? <XCircle size={18} /> : r.type === 'created' ? <Activity size={18} /> : <CheckCircle2 size={18} />}
+                                            </div>
+                                            <div>
+                                                <div className="flex items-center gap-2">
+                                                    <p className="text-sm font-bold text-white">{r.purpose}</p>
+                                                    <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded border ${isSolanaTx ? 'border-indigo-500/30 text-indigo-400 bg-indigo-500/10' : 'border-orange-500/30 text-orange-400 bg-orange-500/10'}`}>
+                                                        {isSolanaTx ? 'SOLANA' : 'FLARE'}
+                                                    </span>
+                                                </div>
+                                                <p className="text-[10px] text-gray-500 font-mono mt-0.5">{r.walletAddress.slice(0, 8)}...{r.walletAddress.slice(-6)}</p>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <p className="text-sm font-bold text-white">{r.purpose}</p>
-                                            <p className="text-[10px] text-gray-500 font-mono mt-0.5">{r.walletAddress.slice(0, 8)}...{r.walletAddress.slice(-6)}</p>
+                                        <div className="flex items-center gap-3">
+                                            <div className="text-right mr-4">
+                                                <p className="text-sm font-bold text-white">{parseFloat(r.amount).toFixed(2)} {isSolanaTx ? (r.currency || 'SHIP') : 'USDT'}</p>
+                                                <p className="text-[10px] text-gray-500 mt-0.5">{new Date(r.timestamp).toLocaleDateString()}</p>
+                                            </div>
+                                            <div className="flex flex-col gap-1">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-7 w-7 p-0 hover:bg-white/10"
+                                                    onClick={() => window.open(isSolanaTx ? `https://explorer.solana.com/tx/${r.txHash}?cluster=devnet` : `https://coston2-explorer.flare.network/tx/${r.txHash}`, '_blank')}
+                                                    title="View Transaction"
+                                                >
+                                                    <ExternalLink size={12} className="text-blue-400" />
+                                                </Button>
+                                                {!isSolanaTx && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="h-7 w-7 p-0 hover:bg-white/10"
+                                                        onClick={() => handleExportReceipt(r)}
+                                                        title="Download Receipt"
+                                                    >
+                                                        <FileText size={12} className="text-emerald-400" />
+                                                    </Button>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-3">
-                                        <div className="text-right mr-4">
-                                            <p className="text-sm font-bold text-white">{parseFloat(r.amount).toFixed(2)} USDT</p>
-                                            <p className="text-[10px] text-gray-500 mt-0.5">{new Date(r.timestamp).toLocaleDateString()}</p>
-                                        </div>
-                                        <div className="flex flex-col gap-1">
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className="h-7 w-7 p-0 hover:bg-white/10"
-                                                onClick={() => window.open(`https://coston2-explorer.flare.network/tx/${r.txHash}`, '_blank')}
-                                                title="View Transaction"
-                                            >
-                                                <ExternalLink size={12} className="text-blue-400" />
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className="h-7 w-7 p-0 hover:bg-white/10"
-                                                onClick={() => handleExportReceipt(r)}
-                                                title="Download Receipt"
-                                            >
-                                                <FileText size={12} className="text-emerald-400" />
-                                            </Button>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))
+                                );
+                            })
                         ) : (
                             <div className="text-center py-10 text-gray-500">No activity recorded yet</div>
                         )}
