@@ -2,7 +2,7 @@ import { Program, AnchorProvider, Idl, BN } from "@coral-xyz/anchor";
 import { Connection, PublicKey, Commitment } from "@solana/web3.js";
 import { AnchorWallet } from "@solana/wallet-adapter-react";
 import { SAVIQUE_PROGRAM_ID } from "./solana";
-import IDL from "../solana-program/target/idl/savique_vault.json";
+import IDL from "./idl/savique_vault.json";
 
 /** Vault account data as decoded by Anchor */
 export interface VaultAccountData {
