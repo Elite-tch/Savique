@@ -19,8 +19,9 @@ import { useEcosystemAccount } from "@/hooks/useEcosystemAccount";
 import { useEcosystem } from "@/context/EcosystemContext";
 import { useConnection, useWallet, useAnchorWallet } from "@solana/wallet-adapter-react";
 import * as anchor from "@coral-xyz/anchor";
-import { PublicKey as SolanaPubkey } from "@solana/web3.js";
+import { PublicKey as SolanaPubkey, SystemProgram } from "@solana/web3.js";
 import { DEVNET_SHIP_MINT, DEVNET_USDC_MINT, SAVIQUE_PROGRAM_ID } from "@/lib/solana";
+import { getAssociatedTokenAddressSync, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID } from "@solana/spl-token";
 
 const MAX_UINT256 = BigInt("115792089237316195423570985008687907853269984665640564039457584007913129639935");
 
@@ -600,6 +601,18 @@ export default function CreatePersonalVault() {
                 try { beneficiaryPubkey = new SolanaPubkey(formData.beneficiary.trim()); } catch { }
             }
 
+            // Derive Vault PDA & Associated Token Accounts for the transaction
+            const [vaultPDA] = SolanaPubkey.findProgramAddressSync(
+                [
+                    Buffer.from("vault"),
+                    publicKey.toBuffer(),
+                    Buffer.from(formData.purpose)
+                ],
+                SAVIQUE_PROGRAM_ID
+            );
+            const vaultTokenAccount = getAssociatedTokenAddressSync(mint, vaultPDA, true);
+            const ownerTokenAccount = getAssociatedTokenAddressSync(mint, publicKey);
+
             // Build & send transaction via Anchor
             const tx = await (program.methods as any)
                 .createVault(
@@ -611,6 +624,12 @@ export default function CreatePersonalVault() {
                 .accounts({
                     owner: publicKey,
                     mint: mint,
+                    vault: vaultPDA,
+                    vaultTokenAccount: vaultTokenAccount,
+                    ownerTokenAccount: ownerTokenAccount,
+                    tokenProgram: TOKEN_PROGRAM_ID,
+                    associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+                    systemProgram: SystemProgram.programId,
                 })
                 .transaction();
 
@@ -627,15 +646,7 @@ export default function CreatePersonalVault() {
                 ...latestBlockhash
             });
 
-            // Derive vault PDA for DB storage - MUST MATCH PROGRAM SEEDS
-            const [vaultPDA] = SolanaPubkey.findProgramAddressSync(
-                [
-                    Buffer.from("vault"),
-                    publicKey.toBuffer(),
-                    Buffer.from(formData.purpose)
-                ],
-                SAVIQUE_PROGRAM_ID
-            );
+            // DB Storage relies on the vaultPDA we already derived above
 
             await saveVault({
                 vaultAddress: vaultPDA.toBase58(),

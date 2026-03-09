@@ -67,9 +67,9 @@ export default function LandingPage() {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.5 }}
                     >
-                        <h1 className="text-3xl md:text-7xl font-bold  mb-6 tracking-tight text-white">
-                            Purpose Aware <br />
-                            <span className="text-primary glow ">Savings & Commitment</span>
+                        <h1 className="text-3xl md:text-7xl font-bold  mb-6 tracking-tigh  text-white">
+                            Save With Purpose, <br />
+                            <span className="text-primary glow ">Achieve With Ease.</span>
                         </h1>
                         <p className="text-xl text-gray-400 mb-10 max-w-2xl mx-auto">
                             Lock funds for specific goals, enforce discipline with smart contracts,

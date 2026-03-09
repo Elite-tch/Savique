@@ -7,8 +7,10 @@ export const SAVIQUE_PROGRAM_ID = new PublicKey("EXfgq3u62BMSyPDT9hvyfYUCjEGuTcb
 // Devnet USDC Mint
 export const DEVNET_USDC_MINT = new PublicKey("4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU");
 
-// SHIP Token Mint - Deployed on Devnet (9 decimals)
-export const DEVNET_SHIP_MINT = new PublicKey("E9zvTs2QfqXA2QFZ3Ht6YX5w4yzfJxbKWoWDHd2CtBEX");
+// SHIP Token Mint - Newly Generated Devnet Test Token (9 decimals)
+export const DEVNET_SHIP_MINT = new PublicKey(
+    process.env.NEXT_PUBLIC_DEVNET_SHIP_MINT || "HFuiGv1GTe6pKL6tdKks2E8WnYCWEfVmqHxvV5KVX5WA"
+);
 
 /**
  * Derives the Vault PDA address for a user and a specific vault index.

@@ -2,13 +2,13 @@
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Lock, Wallet, TrendingUp, CheckCircle, Eye, EyeOff } from "lucide-react";
+import { Plus, Lock, Wallet, TrendingUp, CheckCircle, Eye, EyeOff, Coins, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { useAccount, useReadContract, useReadContracts } from "wagmi";
 import { formatUnits } from "viem";
 import { CONTRACTS, VAULT_FACTORY_ABI, VAULT_ABI, ERC20_ABI } from "@/lib/contracts";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { VaultPreviewCard } from "@/components/VaultPreviewCard";
 import { useContractAddresses } from "@/hooks/useContractAddresses";
 import { Input } from "@/components/ui/input";
@@ -17,9 +17,10 @@ import { usePublicClient } from "wagmi";
 import { useEcosystemAccount } from "@/hooks/useEcosystemAccount";
 import { useEcosystem } from "@/context/EcosystemContext";
 import { useVaults } from "@/hooks/useVaults";
-import { useConnection } from "@solana/wallet-adapter-react";
+import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 import { DEVNET_SHIP_MINT, DEVNET_USDC_MINT } from "@/lib/solana";
+import { toast } from "sonner";
 
 
 function StatCard({ stat }: { stat: any }) {
@@ -63,6 +64,8 @@ export default function Dashboard() {
     const [solanaUsdcBalance, setSolanaUsdcBalance] = useState<string | null>(null);
     const [dashboardToken, setDashboardToken] = useState<"SHIP" | "USDC">("USDC");
     const { connection } = useConnection();
+    const { publicKey } = useWallet();
+    const [solanaBalanceRefetchKey, setSolanaBalanceRefetchKey] = useState(0);
 
     // USDT Balance
     const { data: balance, isLoading, isError, error } = useReadContract({
@@ -86,42 +89,82 @@ export default function Dashboard() {
         console.error("USDT Balance Error:", error);
     }
 
+    const fetchSolanaBalances = useCallback(async () => {
+        if (!isSolana || !address || !connection) return;
+        try {
+            const ownerPubkey = new PublicKey(address);
+
+            // Fetch SHIP balance
+            const shipAccounts = await connection.getParsedTokenAccountsByOwner(
+                ownerPubkey,
+                { mint: DEVNET_SHIP_MINT }
+            );
+            if (shipAccounts.value.length > 0) {
+                setSolanaShipBalance(shipAccounts.value[0].account.data.parsed.info.tokenAmount.uiAmountString);
+            } else {
+                setSolanaShipBalance("0");
+            }
+
+            // Fetch USDC balance
+            const usdcAccounts = await connection.getParsedTokenAccountsByOwner(
+                ownerPubkey,
+                { mint: DEVNET_USDC_MINT }
+            );
+            if (usdcAccounts.value.length > 0) {
+                setSolanaUsdcBalance(usdcAccounts.value[0].account.data.parsed.info.tokenAmount.uiAmountString);
+            } else {
+                setSolanaUsdcBalance("0");
+            }
+        } catch (err) {
+            console.error("Failed to fetch Solana balances:", err);
+            setSolanaShipBalance("---");
+            setSolanaUsdcBalance("---");
+        }
+    }, [isSolana, address, connection]);
+
+    const forceRefetchSolanaBalance = () => {
+        setSolanaBalanceRefetchKey(prev => prev + 1);
+    };
+
     // Fetch SHIP & USDC balances on Solana
     useEffect(() => {
-        if (!isSolana || !address || !connection) return;
-        const fetchBalances = async () => {
-            try {
-                const ownerPubkey = new PublicKey(address);
+        fetchSolanaBalances();
+    }, [fetchSolanaBalances, solanaBalanceRefetchKey]);
 
-                // Fetch SHIP balance
-                const shipAccounts = await connection.getParsedTokenAccountsByOwner(
-                    ownerPubkey,
-                    { mint: DEVNET_SHIP_MINT }
-                );
-                if (shipAccounts.value.length > 0) {
-                    setSolanaShipBalance(shipAccounts.value[0].account.data.parsed.info.tokenAmount.uiAmountString);
-                } else {
-                    setSolanaShipBalance("0");
-                }
+    const [isMinting, setIsMinting] = useState(false);
 
-                // Fetch USDC balance
-                const usdcAccounts = await connection.getParsedTokenAccountsByOwner(
-                    ownerPubkey,
-                    { mint: DEVNET_USDC_MINT }
-                );
-                if (usdcAccounts.value.length > 0) {
-                    setSolanaUsdcBalance(usdcAccounts.value[0].account.data.parsed.info.tokenAmount.uiAmountString);
-                } else {
-                    setSolanaUsdcBalance("0");
-                }
-            } catch (err) {
-                console.error("Failed to fetch Solana balances:", err);
-                setSolanaShipBalance("---");
-                setSolanaUsdcBalance("---");
+    const handleMintShip = async () => {
+        if (!publicKey) {
+            toast.error("Please connect your wallet first");
+            return;
+        }
+
+        setIsMinting(true);
+        const toastId = toast.loading("Minting 10,000 test SHIP...");
+
+        try {
+            const res = await fetch('/api/faucet', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ targetAddress: publicKey.toBase58() })
+            });
+
+            const data = await res.json();
+
+            if (res.ok && data.success) {
+                toast.success("Successfully minted 10,000 SHIP!", { id: toastId });
+                // Refresh balance after a short delay to let RPC sync
+                setTimeout(() => forceRefetchSolanaBalance(), 2000);
+            } else {
+                toast.error(data.error || "Failed to mint SHIP", { id: toastId });
             }
-        };
-        fetchBalances();
-    }, [isSolana, address, connection]);
+        } catch (error) {
+            console.error(error);
+            toast.error("An error occurred while minting", { id: toastId });
+        } finally {
+            setIsMinting(false);
+        }
+    };
 
     // Get user's vaults using Unified Hook (Flare + Solana)
     const { vaults: unifiedVaults, loading: loadingVaults } = useVaults();
@@ -296,7 +339,21 @@ export default function Dashboard() {
         <div className="space-y-8">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold text-white">Dashboard Overview</h1>
+                    <div className="flex items-center gap-4">
+                        <h1 className="text-3xl font-bold text-white">Dashboard Overview</h1>
+                        {isSolana && dashboardToken === 'SHIP' && (
+                            <Button
+                                onClick={handleMintShip}
+                                disabled={isMinting || !publicKey}
+                                size="sm"
+                                variant="outline"
+                                className="bg-primary/10 border-primary/20 text-primary hover:bg-primary/20 hover:text-white transition-all h-8 flex items-center gap-2"
+                            >
+                                {isMinting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Coins className="w-3.5 h-3.5" />}
+                                Get 10k Test SHIP
+                            </Button>
+                        )}
+                    </div>
                     <p className="text-gray-400 mt-1">Snapshot of your wealth and Savings activity.</p>
                 </div>
                 {isSolana && (
