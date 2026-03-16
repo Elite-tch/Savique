@@ -38,7 +38,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Savique | Secure Digital Savings & Goals",
     description: "Automated, purpose-driven savings secured by smart protocol technology. Build discipline and a verifiable financial reputation.",
-    url: "https://savique-fb5p.vercel.app",
+    url: "https://testnet.savique.xyz",
     siteName: "Savique",
     locale: "en_US",
     type: "website",
