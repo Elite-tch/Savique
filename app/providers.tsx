@@ -18,7 +18,6 @@ import { WagmiProvider, createConfig } from 'wagmi';
 import { defineChain } from "viem";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { http } from "viem";
-import { ProofRailsProvider } from "@proofrails/sdk/react";
 import { Toaster } from "sonner";
 import { AutoDisconnect } from "@/components/AutoDisconnect";
 
@@ -124,11 +123,11 @@ export default function Providers({ children }: { children: React.ReactNode }) {
                         overlayBlur: 'small',
                     })}
                 >
-                    <ProofRailsProvider apiKey={process.env.NEXT_PUBLIC_PROOFRAILS_KEY || ""}>
+                    <>
                         <AutoDisconnect />
                         {children}
                         <Toaster position="top-right" theme="dark" richColors closeButton />
-                    </ProofRailsProvider>
+                    </>
                 </RainbowKitProvider>
             </QueryClientProvider>
         </WagmiProvider>

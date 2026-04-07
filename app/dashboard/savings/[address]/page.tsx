@@ -12,7 +12,6 @@ import { Lock, Unlock, ArrowLeft, Clock, Wallet, AlertTriangle, ShieldCheck, Eye
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { VaultBreakModal } from "@/components/VaultBreakModal";
-import { useProofRails } from "@proofrails/sdk/react";
 import { saveReceipt, getVaultByAddress, SavedVault, updateReceipt, saveVault, getReceiptsByVault, Receipt } from "@/lib/receiptService";
 import { createNotification } from "@/lib/notificationService";
 import { getUserProfile } from "@/lib/userService";
@@ -75,9 +74,8 @@ export default function VaultDetailPage() {
     // Add toast ref
     const [withdrawingAmount, setWithdrawingAmount] = useState<string>("0");
 
-    // ProofRails Integration
-    const sdk = useProofRails();
-    const [isGeneratingProof, setIsGeneratingProof] = useState(false);
+    // Transaction State
+    const [isFinalizing, setIsFinalizing] = useState(false);
     const lastProcessedHash = useRef<string | null>(null);
     const toastId = useRef<string | number | null>(null);
     const [vaultData, setVaultData] = useState<SavedVault | null>(null);
@@ -233,7 +231,6 @@ export default function VaultDetailPage() {
             sendFailureEmail();
 
             setTopUpStep('idle');
-            setIsGeneratingProof(false);
         }
     }, [confirmError, userAddress, purpose, topUpAmount, withdrawingAmount, hash]);
 
@@ -254,7 +251,7 @@ export default function VaultDetailPage() {
 
     useEffect(() => {
         // Only generate receipts for actual deposits/withdrawals, NOT for approvals
-        if (isSuccess && hash && receipt && !isGeneratingProof &&
+        if (isSuccess && hash && receipt && !isFinalizing &&
             lastProcessedHash.current !== receipt.transactionHash &&
             (topUpStep === 'depositing' || withdrawingAmount !== "0")) {
             // Check for reverted status
@@ -300,9 +297,9 @@ export default function VaultDetailPage() {
                 toast.success("Transaction Successful", { ...toastStyle, id: toastId.current });
                 toastId.current = null;
             }
-            setIsGeneratingProof(true);
+            setIsFinalizing(true);
 
-            const generateReceipt = async () => {
+            const finalizeTransaction = async () => {
                 const amountToSave = withdrawingAmount !== "0" ? withdrawingAmount : (topUpAmount !== "" ? topUpAmount : balance);
                 const isDeposit = topUpStep === 'depositing' || topUpStep === 'done';
                 const currentTotal = parseFloat(balance);
@@ -314,103 +311,9 @@ export default function VaultDetailPage() {
                     : `Withdrawal: ${purpose}`;
 
                 try {
-                    console.log(`[${isDeposit ? 'Deposit' : 'Withdraw'}] Generating receipt for ${amountToSave} USDT0...`);
+                    console.log(`[${isDeposit ? 'Deposit' : 'Withdraw'}] Finalizing ${amountToSave} USDT0...`);
 
-                    // 1. Generate ProofRails Receipt
-                    const receiptResult = await sdk.templates.payment({
-                        amount: parseFloat(amountToSave),
-                        from: isDeposit ? userAddress! : address,
-                        to: isDeposit ? address : userAddress!,
-                        purpose: isDeposit ? `Savings Deposit: ${purpose}` : `Savings Withdrawal: ${purpose}`,
-                        transactionHash: receipt.transactionHash
-                    });
-
-                    // 2. Save Receipt to Firestore
-                    await saveReceipt({
-                        walletAddress: userAddress!.toLowerCase(),
-                        vaultAddress: address,
-                        txHash: receipt.transactionHash,
-                        timestamp: Date.now(),
-                        purpose: customPurpose,
-                        amount: parseFloat(amountToSave).toFixed(2),
-                        type: isDeposit ? 'created' : 'completed',
-                        verified: !!receiptResult?.id,
-                        proofRailsId: receiptResult?.id
-                    });
-
-                    // 3. Notify User
-                    await createNotification(
-                        userAddress!,
-                        isDeposit ? "Deposit & Receipt Verified" : "Withdrawal & Receipt Verified",
-                        isDeposit
-                            ? `Successfully added ${amountToSave} to your "${purpose}" savings. Your digital receipt is verified.`
-                            : `Successfully withdrew funds from your "${purpose}" savings. Your digital receipt is verified.`,
-                        'success',
-                        isDeposit ? `/dashboard/savings/${address}` : '/dashboard/history',
-                        receiptResult?.id
-                    );
-
-                    // 4. Send Professional Email Notification
-                    try {
-                        const profile = await getUserProfile(userAddress!);
-                        if (profile?.email) {
-                            if (isDeposit && profile.notificationPreferences.deposits) {
-                                await fetch('/api/notify', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({
-                                        type: 'TOP_UP_CONFIRMED',
-                                        userEmail: profile.email,
-                                        purpose: purpose || "Savings Top Up",
-                                        amount: amountToSave,
-                                        txHash: receipt.transactionHash,
-                                        proofRailsId: receiptResult?.id,
-                                        currentBalance: balance
-                                    })
-                                });
-                            } else if (!isDeposit && profile.notificationPreferences.withdrawals) {
-                                await fetch('/api/notify', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({
-                                        type: 'WITHDRAWAL_SUCCESS',
-                                        userEmail: profile.email,
-                                        purpose: purpose || "Savings Withdrawal",
-                                        amount: amountToSave,
-                                        txHash: receipt.transactionHash,
-                                        proofRailsId: receiptResult?.id
-                                    })
-                                });
-                            }
-                        }
-                    } catch (emailErr) {
-                        console.warn('[Email] Failed to send notification:', emailErr);
-                    }
-
-                    toast.success("Receipt Generated", toastStyle);
-
-                    // Refetch all data to update UI immediately
-                    refetchBalance();
-                    refetchUserBalance();
-
-                    if (isDeposit) {
-                        setTopUpStep('done');
-                        setTopUpAmount("");
-                        setWithdrawingAmount("0");
-                        setIsGeneratingProof(false); // Allow further actions
-
-                        // Redirect after a short delay so user sees success
-                        setTimeout(() => {
-                            router.push("/dashboard/savings");
-                        }, 2000);
-                    } else {
-                        router.push("/dashboard/savings");
-                    }
-                } catch (error) {
-                    console.error("Failed to generate receipt:", error);
-                    toast.error("Receipt Generation Failed", toastStyle);
-
-                    // Fallback: save to Firestore even on error
+                    // 1. Save Receipt to Firestore
                     await saveReceipt({
                         walletAddress: userAddress!.toLowerCase(),
                         vaultAddress: address,
@@ -422,22 +325,22 @@ export default function VaultDetailPage() {
                         verified: false
                     });
 
-                    // Notify fallback
+                    // 2. Notify User
                     await createNotification(
                         userAddress!,
-                        isDeposit ? "Deposit Success" : "Withdrawal Success - Receipt Pending",
+                        isDeposit ? "Deposit Secure" : "Withdrawal Secure",
                         isDeposit
-                            ? `Successfully added ${amountToSave} to your savings. Your digital receipt is pending.`
-                            : `Funds from "${purpose}" are back in your wallet. Your receipt is still processing.`,
-                        'info',
+                            ? `Successfully added ${amountToSave} to your "${purpose}" savings.`
+                            : `Successfully withdrew funds from your "${purpose}" savings.`,
+                        'success',
                         isDeposit ? `/dashboard/savings/${address}` : '/dashboard/history'
                     );
 
-                    // Still send email even if ProofRails fails
+                    // 3. Send Professional Email Notification
                     try {
                         const profile = await getUserProfile(userAddress!);
                         if (profile?.email) {
-                            if (isDeposit && profile.notificationPreferences.deposits) {
+                            if (isDeposit && (!profile.notificationPreferences || profile.notificationPreferences.deposits)) {
                                 await fetch('/api/notify', {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
@@ -450,7 +353,7 @@ export default function VaultDetailPage() {
                                         currentBalance: balance
                                     })
                                 });
-                            } else if (!isDeposit && profile.notificationPreferences.withdrawals) {
+                            } else if (!isDeposit && (!profile.notificationPreferences || profile.notificationPreferences.withdrawals)) {
                                 await fetch('/api/notify', {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
@@ -465,10 +368,11 @@ export default function VaultDetailPage() {
                             }
                         }
                     } catch (emailErr) {
-                        console.warn('[Email] Failed to send fallback notification:', emailErr);
+                        console.warn('[Email] Failed to send notification:', emailErr);
                     }
 
-                    // Refetch data even on error fallback
+                    toast.success("Ready!", toastStyle);
+
                     refetchBalance();
                     refetchUserBalance();
 
@@ -476,19 +380,22 @@ export default function VaultDetailPage() {
                         setTopUpStep('done');
                         setTopUpAmount("");
                         setWithdrawingAmount("0");
-                        setIsGeneratingProof(false);
-
+                        setIsFinalizing(false);
                         setTimeout(() => {
                             router.push("/dashboard/savings");
                         }, 2000);
                     } else {
                         router.push("/dashboard/savings");
                     }
+                } catch (error) {
+                    console.error("Failed to finalize transaction:", error);
+                    toast.error("Process Failed", toastStyle);
+                    setIsFinalizing(false);
                 }
             };
-            generateReceipt();
+            finalizeTransaction();
         }
-    }, [isSuccess, router, hash, purpose, balance, receipt, sdk, isGeneratingProof, withdrawingAmount, userAddress, address, topUpStep, topUpAmount]);
+    }, [isSuccess, router, hash, purpose, balance, receipt, isFinalizing, withdrawingAmount, userAddress, address, topUpStep, topUpAmount, refetchBalance, refetchUserBalance, vaultData, toastStyle]);
 
     const handleWithdrawUnlocked = () => {
         try {

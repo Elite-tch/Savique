@@ -15,7 +15,6 @@ import { getUserVaultsFromDb } from "@/lib/receiptService";
 import { createNotification } from "@/lib/notificationService";
 import { usePublicClient } from "wagmi";
 import { CONTRACTS, VAULT_ABI } from "@/lib/contracts";
-import { ReceiptSync } from "@/components/ReceiptSync";
 
 function useDeadlinePulse(address?: string) {
     const publicClient = usePublicClient();
@@ -214,11 +213,157 @@ function SidebarContent({ pathname, onNavigate }: { pathname: string; onNavigate
     );
 }
 
+const BOTTOM_NAV_PRIMARY = [
+    { href: "/dashboard", icon: LayoutDashboard, label: "Home", exact: true },
+    { href: "/dashboard/savings", icon: Lock, label: "Savings", exact: false },
+    { href: "/dashboard/create", icon: PlusCircle, label: "Create", exact: false },
+    { href: "/dashboard/history", icon: History, label: "History", exact: false },
+];
+
+const BOTTOM_NAV_MORE = [
+    { href: "/dashboard/analysis", icon: BarChart3, label: "Analysis" },
+    { href: "/dashboard/leaderboard", icon: Trophy, label: "Leaderboard" },
+    { href: "/dashboard/tips", icon: Lightbulb, label: "Savings Tips" },
+    { href: "/dashboard/settings", icon: Settings, label: "Settings" },
+];
+
+function MobileBottomNav({ pathname }: { pathname: string }) {
+    const [moreOpen, setMoreOpen] = useState(false);
+    const isMoreActive = BOTTOM_NAV_MORE.some(i => pathname.startsWith(i.href));
+
+    return (
+        <>
+            {/* Backdrop with higher blur for focus */}
+            <AnimatePresence>
+                {moreOpen && (
+                    <motion.div
+                        key="backdrop"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 md:hidden"
+                        onClick={() => setMoreOpen(false)}
+                    />
+                )}
+            </AnimatePresence>
+
+            {/* Non-full-height Slide-up Bottom Drawer */}
+            <AnimatePresence>
+                {moreOpen && (
+                    <motion.div
+                        key="drawer"
+                        initial={{ y: "100%" }}
+                        animate={{ y: 0 }}
+                        exit={{ y: "100%" }}
+                        transition={{ type: "spring", damping: 25, stiffness: 250 }}
+                        className="fixed bottom-[68px] left-0 right-0 z-50 md:hidden mx-4 mb-4 bg-zinc-900 border border-white/10 rounded overflow-hidden shadow-2xl"
+                    >
+                        <div className="p-2 pt-6">
+                            <div className="px-6 pb-4 border-b border-white/5 flex items-center justify-between">
+                                <h3 className="text-xs font-black uppercase tracking-widest text-zinc-500">More Options</h3>
+                                <button
+                                    onClick={() => setMoreOpen(false)}
+                                    className="p-1 rounded-lg text-zinc-500 hover:text-white transition-colors"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+                            <div className="p-2 space-y-1">
+                                {BOTTOM_NAV_MORE.map(({ href, icon: Icon, label }) => {
+                                    const active = pathname.startsWith(href);
+                                    return (
+                                        <Link
+                                            key={href}
+                                            href={href}
+                                            onClick={() => setMoreOpen(false)}
+                                            className={`flex items-center gap-4 px-5 py-3 rounded transition-all ${active
+                                                ? " text-primary"
+                                                : "text-zinc-400 hover:bg-white/5 hover:text-white"
+                                                }`}
+                                        >
+                                            <div className={`p-2 rounded-xl ${active ? 'bg-primary/20' : 'bg-white/5'}`}>
+                                                <Icon className="w-5 h-5 flex-shrink-0" />
+                                            </div>
+                                            <span className="font-bold text-sm tracking-tight">{label}</span>
+                                        </Link>
+                                    );
+                                })}
+                            </div>
+                            <div className="mt-2 p-4 bg-primary mx-2 mb-2 rounded-[2rem] flex items-center justify-between border border-white/5">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                                    <span className="text-[10px] font-black text-white uppercase tracking-tighter">Savique v1.0.0</span>
+                                </div>
+                                <span className="text-[9px] text-white font-bold uppercase tracking-widest">Protocol Live</span>
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Bottom Navigation Bar */}
+            <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden border-t border-white/10 bg-black/95 backdrop-blur-xl">
+                <div className="flex items-center justify-around h-[68px] px-1">
+                    {BOTTOM_NAV_PRIMARY.map(({ href, icon: Icon, label, exact }) => {
+                        const active = exact ? pathname === href : pathname.startsWith(href);
+                        return (
+                            <Link
+                                key={href}
+                                href={href}
+                                onClick={() => setMoreOpen(false)}
+                                className="flex flex-col items-center justify-center gap-1 flex-1 h-full relative group"
+                            >
+                                {active && (
+                                    <motion.div
+                                        layoutId="mobile-nav-indicator"
+                                        className="absolute top-0 left-1/2 -translate-x-1/2 w-10 h-0.5 bg-primary rounded-full transition-all duration-300"
+                                        transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                                    />
+                                )}
+                                <Icon className={`w-6 h-6 transition-colors ${active ? "text-primary" : "text-zinc-500 group-hover:text-zinc-300"}`} />
+                                <span className={`text-[10px] font-black uppercase tracking-tight transition-colors ${active ? "text-primary" : "text-zinc-500 group-hover:text-zinc-300"}`}>
+                                    {label}
+                                </span>
+                            </Link>
+                        );
+                    })}
+
+                    <button
+                        onClick={() => setMoreOpen(prev => !prev)}
+                        className="flex flex-col items-center justify-center gap-1 flex-1 h-full relative"
+                    >
+                        {(isMoreActive && !moreOpen) && (
+                            <motion.div
+                                layoutId="mobile-nav-indicator"
+                                className="absolute top-0 left-1/2 -translate-x-1/2 w-10 h-0.5 bg-primary rounded-full"
+                                transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                            />
+                        )}
+                        <motion.div
+                            animate={{
+                                rotate: moreOpen ? 90 : 0,
+                                scale: moreOpen ? 1.1 : 1
+                            }}
+                            transition={{ duration: 0.2 }}
+                        >
+                            <Menu className={`w-6 h-6 transition-colors ${moreOpen || isMoreActive ? "text-primary" : "text-zinc-500"}`} />
+                        </motion.div>
+                        <span className={`text-[10px] font-black uppercase tracking-tight transition-colors ${moreOpen || isMoreActive ? "text-primary" : "text-zinc-500"}`}>
+                            More
+                        </span>
+                    </button>
+                </div>
+            </nav>
+        </>
+    );
+}
+
+
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
     const { address: walletAddress, isConnected } = useAccount();
     const { disconnect } = useDisconnect();
     const pathname = usePathname();
-    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
     useDeadlinePulse(walletAddress);
 
@@ -227,6 +372,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     };
 
     const shortAddress = walletAddress ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : "";
+    void shortAddress; // used for potential future display
 
     return (
         <div className="min-h-screen flex bg-black text-white selection:bg-primary/30">
@@ -235,35 +381,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <SidebarContent pathname={pathname} />
             </aside>
 
-            {/* Mobile Sidebar Overlay */}
-            <AnimatePresence>
-                {isMobileMenuOpen && (
-                    <>
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="fixed inset-0 bg-black/80 z-40 md:hidden backdrop-blur-sm"
-                            onClick={() => setIsMobileMenuOpen(false)}
-                        />
-                        <motion.div
-                            initial={{ x: "-100%" }}
-                            animate={{ x: 0 }}
-                            exit={{ x: "-100%" }}
-                            transition={{ type: "spring", damping: 20 }}
-                            className="fixed inset-y-0 left-0 w-64 bg-black border-r border-white/10 flex flex-col z-50 md:hidden"
-                        >
-                            <SidebarContent pathname={pathname} onNavigate={() => setIsMobileMenuOpen(false)} />
-                            <button
-                                onClick={() => setIsMobileMenuOpen(false)}
-                                className="absolute top-4 right-4 p-2 text-gray-400 hover:text-white"
-                            >
-                                <X className="w-5 h-5" />
-                            </button>
-                        </motion.div>
-                    </>
-                )}
-            </AnimatePresence>
+            {/* Mobile Bottom Navigation */}
+            <MobileBottomNav pathname={pathname} />
 
             {/* Main Wrapper */}
             <div className="md:pl-64 flex flex-col min-h-screen w-full transition-all duration-300">
@@ -281,7 +400,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                             <div className="flex items-center md:gap-4">
 
                                 <NotificationBell />
-                                <ReceiptSync />
                                 <div className="hidden md:block">
                                     <ConnectButton
                                         accountStatus="address"
@@ -303,22 +421,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </header >
 
                 {/* Content */}
-                < main className="flex-1 p-4 md:p-8 overflow-x-hidden" >
+                < main className="flex-1 p-4 md:p-8 pb-24 md:pb-8 overflow-x-hidden" >
                     <div className="max-w-7xl mx-auto w-full">
                         {children}
 
                     </div>
                 </main >
 
-                {/* Mobile Menu FAB */}
-                < Button
-                    size="icon"
-                    className="fixed bottom-6 flex gap-2 px-3 right-6 z-50 md:hidden rounded-full shadow-lg shadow-primary/25 bg-primary text-white hover:bg-primary/90 h-12 w-fit"
-                    onClick={() => setIsMobileMenuOpen(true)
-                    }
-                >
-                    <Menu className="w-6 h-6" />  <span className="text-xl">Menu</span>
-                </Button >
+
             </div >
         </div >
     );

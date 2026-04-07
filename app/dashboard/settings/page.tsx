@@ -108,7 +108,7 @@ export default function SettingsPage() {
                                     <h3>Email Notifications</h3>
                                 </div>
                                 <p className="text-sm text-zinc-500">
-                                    Receive verified ProofRails receipts and maturity alerts directly in your inbox.
+                                    Receive verified digital receipts and maturity alerts directly in your inbox.
                                 </p>
                                 <div className="space-y-2">
                                     <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Email Address</label>
@@ -214,12 +214,12 @@ function PreferenceToggle({ label, description, enabled, onChange }: { label: st
             </div>
             <div className="flex justify-end">
                 <button
-                type="button"
-                onClick={() => onChange(!enabled)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${enabled ? 'bg-primary' : 'bg-zinc-700'}`}
-            >
-                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${enabled ? 'translate-x-6' : 'translate-x-1'}`} />
-            </button>
+                    type="button"
+                    onClick={() => onChange(!enabled)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${enabled ? 'bg-primary' : 'bg-zinc-700'}`}
+                >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${enabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                </button>
             </div>
         </div>
     );

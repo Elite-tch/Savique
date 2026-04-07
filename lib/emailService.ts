@@ -32,7 +32,6 @@ interface EmailData {
     amount: string;
     txHash?: string;
     unlockDate?: string;
-    proofRailsId?: string;
     daysRemaining?: number;
     targetAmount?: string;
     currentBalance?: string;
@@ -50,8 +49,6 @@ export async function sendNotificationEmail(type: EmailType, data: EmailData) {
     const brandColor = '#E62058';
     const darkBg = '#18181B';
     const logoUrl = 'https://res.cloudinary.com/dibwnfwk9/image/upload/v1770464073/ChatGPT_Image_Feb_6__2026__07_08_19_AM-removebg-preview_tvlkzh.png'; // Your Savique logo
-    const proofRailsUrl = data.proofRailsId ? `https://proofrails-clone-middleware.onrender.com/receipt/${data.proofRailsId}` : '';
-    const qrCodeUrl = data.proofRailsId ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${proofRailsUrl}` : '';
     const explorerUrl = data.txHash ? `https://coston2-explorer.flare.network/tx/${data.txHash}` : '';
 
     switch (type) {
@@ -112,36 +109,9 @@ export async function sendNotificationEmail(type: EmailType, data: EmailData) {
                                                 </tr>
                                             </table>
                                             
-                                            ${data.proofRailsId ? `
-                                            <!-- ProofRails Verification -->
-                                            <table width="100%" cellpadding="0" cellspacing="0" style="border: 2px solid #E4E4E7; border-radius: 12px; margin-bottom: 24px;">
-                                                <tr>
-                                                    <td style="padding: 24px;">
-                                                        <table width="100%" cellpadding="0" cellspacing="0">
-                                                            <tr>
-                                                                <td style="vertical-align: top; width: 70%;">
-                                                                    <h3 style="margin: 0 0 8px 0; color: #18181B; font-size: 16px; font-weight: 700;">✓ ProofRails Verified</h3>
-                                                                    <p style="margin: 0 0 16px 0; color: #71717A; font-size: 13px; line-height: 1.5;">
-                                                                        This transaction has been cryptographically verified and recorded on the blockchain.
-                                                                    </p>
-                                                                    <a href="${proofRailsUrl}" style="display: inline-block; background-color: ${brandColor}; color: #ffffff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">
-                                                                        View Full Receipt
-                                                                    </a>
-                                                                </td>
-                                                                <td align="center" style="vertical-align: top; width: 30%;">
-                                                                    <img src="${qrCodeUrl}" alt="QR Code" style="width: 120px; height: 120px; border-radius: 8px;">
-                                                                    <p style="margin: 8px 0 0 0; color: #A1A1AA; font-size: 10px;">Scan to verify</p>
-                                                                </td>
-                                                            </tr>
-                                                        </table>
-                                                    </td>
-                                                </tr>
-                                            </table>
-                                            ` : ''}
                                             
                                             <p style="color: #A1A1AA; font-size: 12px; margin: 24px 0 0 0; line-height: 1.5;">
-                                                This is a verifiable ProofRails receipt. Keep it for your records. Your commitment is secured on the Flare Coston2 Network.<br>
-                                                <strong style="color: #71717A;">💡 Tip:</strong> Download a PDF copy from the History page in your dashboard.
+                                                This is a verifiable digital receipt. Keep it for your records. Your commitment is secured on the Flare Coston2 Network.
                                             </p>
                                         </td>
                                     </tr>
@@ -227,33 +197,6 @@ export async function sendNotificationEmail(type: EmailType, data: EmailData) {
                                                 </tr>
                                             </table>
                                             
-                                            ${data.proofRailsId ? `
-                                            <!-- ProofRails Verification -->
-                                            <table width="100%" cellpadding="0" cellspacing="0" style="border: 2px solid #E4E4E7; border-radius: 12px; margin-bottom: 24px;">
-                                                <tr>
-                                                    <td style="padding: 24px;">
-                                                        <table width="100%" cellpadding="0" cellspacing="0">
-                                                            <tr>
-                                                                <td style="vertical-align: top; width: 70%;">
-                                                                    <h3 style="margin: 0 0 8px 0; color: #18181B; font-size: 16px; font-weight: 700;">✓ ProofRails Verified</h3>
-                                                                    <p style="margin: 0 0 16px 0; color: #71717A; font-size: 13px; line-height: 1.5;">
-                                                                        This top-up has been verified on the blockchain.
-                                                                    </p>
-                                                                    <a href="${proofRailsUrl}" style="display: inline-block; background-color: ${brandColor}; color: #ffffff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px; margin-right: 8px;">
-                                                                    View Full Receipt
-                                                                    </a>
-                                                                   
-                                                                </td>
-                                                                <td align="center" style="vertical-align: top; width: 30%;">
-                                                                    <img src="${qrCodeUrl}" alt="QR Code" style="width: 100px; height: 100px; border-radius: 8px;">
-                                                                    <p style="margin: 8px 0 0 0; color: #A1A1AA; font-size: 10px;">Scan to verify</p>
-                                                                </td>
-                                                            </tr>
-                                                        </table>
-                                                    </td>
-                                                </tr>
-                                            </table>
-                                            ` : ''}
                                             
                                             <p style="color: #52525B; font-size: 15px; line-height: 1.6;">
                                                 Every deposit brings you closer to your goal. Stay consistent!
@@ -568,32 +511,6 @@ export async function sendNotificationEmail(type: EmailType, data: EmailData) {
                                                 </tr>
                                             </table>
                                             
-                                            ${data.proofRailsId ? `
-                                            <!-- ProofRails Verification -->
-                                            <table width="100%" cellpadding="0" cellspacing="0" style="border: 2px solid #E4E4E7; border-radius: 12px; margin-bottom: 24px;">
-                                                <tr>
-                                                    <td style="padding: 24px;">
-                                                        <table width="100%" cellpadding="0" cellspacing="0">
-                                                            <tr>
-                                                                <td style="vertical-align: top; width: 70%;">
-                                                                    <h3 style="margin: 0 0 8px 0; color: #18181B; font-size: 16px; font-weight: 700;">✓ ProofRails Verified</h3>
-                                                                    <p style="margin: 0 0 16px 0; color: #71717A; font-size: 13px; line-height: 1.5;">
-                                                                        This withdrawal has been cryptographically verified.
-                                                                    </p>
-                                                                    <a href="${proofRailsUrl}" style="display: inline-block; background-color: ${brandColor}; color: #ffffff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">
-                                                                        View Full Receipt
-                                                                    </a>
-                                                                </td>
-                                                                <td align="center" style="vertical-align: top; width: 30%;">
-                                                                    <img src="${qrCodeUrl}" alt="QR Code" style="width: 100px; height: 100px; border-radius: 8px;">
-                                                                    <p style="margin: 8px 0 0 0; color: #A1A1AA; font-size: 10px;">Scan to verify</p>
-                                                                </td>
-                                                            </tr>
-                                                        </table>
-                                                    </td>
-                                                </tr>
-                                            </table>
-                                            ` : ''}
                                             
                                             <p style="color: #52525B; font-size: 15px; line-height: 1.6;">
                                                 Ready for your next savings goal? Start building towards your dreams again!
@@ -601,15 +518,9 @@ export async function sendNotificationEmail(type: EmailType, data: EmailData) {
                                         </td>
                                     </tr>
                                     
-                                    <!-- Footer -->
-                                    <tr>
-                                        <td style="background-color: #FAFAFA; padding: 24px; text-align: center; border-top: 1px solid #E4E4E7;">
                                             <p style="margin: 0; color: #A1A1AA; font-size: 12px;">
-                                                Savique Protocol • Decentralized Savings on Flare Network<br>
-                                                <strong style="color: #71717A;">💡 Tip:</strong> Download a PDF copy from the History page in your dashboard.
+                                                Savique Protocol • Decentralized Savings on Flare Network
                                             </p>
-                                        </td>
-                                    </tr>
                                 </table>
                             </td>
                         </tr>
@@ -675,32 +586,6 @@ export async function sendNotificationEmail(type: EmailType, data: EmailData) {
                                                 </tr>
                                             </table>
                                             
-                                            ${data.proofRailsId ? `
-                                            <!-- ProofRails Verification -->
-                                            <table width="100%" cellpadding="0" cellspacing="0" style="border: 2px solid #E4E4E7; border-radius: 12px; margin-bottom: 24px;">
-                                                <tr>
-                                                    <td style="padding: 24px;">
-                                                        <table width="100%" cellpadding="0" cellspacing="0">
-                                                            <tr>
-                                                                <td style="vertical-align: top; width: 70%;">
-                                                                    <h3 style="margin: 0 0 8px 0; color: #18181B; font-size: 16px; font-weight: 700;">✓ ProofRails Verified</h3>
-                                                                    <p style="margin: 0 0 16px 0; color: #71717A; font-size: 13px; line-height: 1.5;">
-                                                                        This transaction has been recorded on the blockchain.
-                                                                    </p>
-                                                                    <a href="${proofRailsUrl}" style="display: inline-block; background-color: ${brandColor}; color: #ffffff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">
-                                                                        View Full Receipt
-                                                                    </a>
-                                                                </td>
-                                                                <td align="center" style="vertical-align: top; width: 30%;">
-                                                                    <img src="${qrCodeUrl}" alt="QR Code" style="width: 100px; height: 100px; border-radius: 8px;">
-                                                                    <p style="margin: 8px 0 0 0; color: #A1A1AA; font-size: 10px;">Scan to verify</p>
-                                                                </td>
-                                                            </tr>
-                                                        </table>
-                                                    </td>
-                                                </tr>
-                                            </table>
-                                            ` : ''}
                                             
                                             <div style="background-color: #FEF9C3; border-radius: 8px; padding: 16px; border: 1px solid #FDE047;">
                                                 <p style="margin: 0; color: #713F12; font-size: 14px; line-height: 1.5;">
@@ -714,8 +599,7 @@ export async function sendNotificationEmail(type: EmailType, data: EmailData) {
                                     <tr>
                                         <td style="background-color: #FAFAFA; padding: 24px; text-align: center; border-top: 1px solid #E4E4E7;">
                                             <p style="margin: 0; color: #A1A1AA; font-size: 12px;">
-                                                Savique Protocol • Decentralized Savings on Flare Network<br>
-                                                <strong style="color: #71717A;">💡 Tip:</strong> Download a PDF copy from the History page in your dashboard.
+                                                Savique Protocol • Decentralized Savings on Flare Network
                                             </p>
                                         </td>
                                     </tr>

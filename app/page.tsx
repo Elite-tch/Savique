@@ -210,8 +210,8 @@ export default function LandingPage() {
                             </div>
                             <h3 className="text-xl font-bold text-white mb-3 group-hover:text-primary transition-colors duration-300">Verifiable Proof</h3>
                             <p className="text-gray-400 group-hover:text-gray-300 transition-colors duration-300">
-                                Powered by ProofRails. Every deposit and successful save generates
-                                a permanent, shareable financial receipt.
+                                Powered by Smart Contracts. Every deposit and successful save generates
+                                a permanent, on-chain record of your achievement.
                             </p>
                         </motion.div>
                     </div>

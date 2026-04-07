@@ -21,7 +21,6 @@ export interface AppNotification {
     timestamp: number;
     read: boolean;
     link?: string; // Optional URL to navigate to
-    receiptId?: string; // Optional ProofRails Receipt ID
 }
 
 const NOTIFICATION_COLLECTION = 'notifications';
@@ -34,11 +33,10 @@ export async function createNotification(
     title: string,
     message: string,
     type: AppNotification['type'] = 'info',
-    link?: string,
-    receiptId?: string
+    link?: string
 ) {
     try {
-        console.log('[Notification] Creating notification:', { recipient, title, message, type, link, receiptId });
+        console.log('[Notification] Creating notification:', { recipient, title, message, type, link });
         await addDoc(collection(db, NOTIFICATION_COLLECTION), {
             recipient: recipient.toLowerCase(),
             title,
@@ -46,8 +44,7 @@ export async function createNotification(
             type,
             timestamp: Date.now(),
             read: false,
-            link: link || null,
-            receiptId: receiptId || null
+            link: link || null
         });
         console.log(`[Notification] Created for ${recipient}: ${title}`);
     } catch (error) {
@@ -108,8 +105,7 @@ export function subscribeToNotifications(
                 type: data.type,
                 timestamp: data.timestamp,
                 read: data.read,
-                link: data.link,
-                receiptId: data.receiptId
+                link: data.link
             });
         });
         callback(notifications);

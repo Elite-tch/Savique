@@ -21,8 +21,8 @@ import { usePublicClient } from "wagmi";
 import { VAULT_ABI } from "@/lib/contracts";
 import { formatUnits } from "viem";
 import { motion } from "framer-motion";
-import { generateStatement } from "@/lib/statementGenerator";
 import { toast } from "sonner";
+import { syncUserProfiles } from "@/lib/userService";
 
 import {
     AreaChart,
@@ -94,6 +94,22 @@ export default function AdminDashboard() {
         }
     };
 
+    const handleDeepSync = async () => {
+        if (vaults.length === 0) {
+            toast.error("Load data first before syncing users");
+            return;
+        }
+
+        const toastId = toast.loading("Syncing user profiles...");
+        try {
+            const owners = vaults.map(v => v.owner);
+            const count = await syncUserProfiles(owners);
+            toast.success(`Sync complete! Created ${count} new profiles.`, { id: toastId });
+        } catch (e) {
+            toast.error("Deep sync failed", { id: toastId });
+        }
+    };
+
     useEffect(() => {
         loadData();
     }, [publicClient]);
@@ -142,42 +158,6 @@ export default function AdminDashboard() {
         }
         return days;
     }, [receipts]);
-    const handleExportReceipt = (receipt: Receipt) => {
-        const toastId = toast.loading("Preparing verified receipt...");
-
-        const createWithQR = (qrData?: string) => {
-            try {
-                generateStatement({
-                    receipts: [receipt],
-                    walletAddress: receipt.walletAddress,
-                    startDate: new Date(receipt.timestamp),
-                    endDate: new Date(receipt.timestamp),
-                    qrImageData: qrData
-                });
-                toast.success("Receipt generated", { id: toastId });
-            } catch (e) {
-                toast.error("Failed to generate PDF", { id: toastId });
-            }
-        };
-
-        if (receipt.proofRailsId) {
-            const img = new Image();
-            img.crossOrigin = "Anonymous";
-            img.src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://proofrails-clone-middleware.onrender.com/receipt/${receipt.proofRailsId}`;
-            img.onload = () => {
-                const canvas = document.createElement("canvas");
-                canvas.width = img.width;
-                canvas.height = img.height;
-                const ctx = canvas.getContext("2d");
-                ctx?.drawImage(img, 0, 0);
-                const dataURL = canvas.toDataURL("image/png");
-                createWithQR(dataURL);
-            };
-            img.onerror = () => createWithQR();
-        } else {
-            createWithQR();
-        }
-    };
 
     return (
         <div className="space-y-6 md:space-y-10">
@@ -187,10 +167,15 @@ export default function AdminDashboard() {
                     <p className="text-gray-500 text-xs md:text-sm italic">Real-time surveillance of Savique protocol states</p>
                 </div>
 
-                <Button onClick={loadData} variant="outline" className="border-white/5 bg-white/5 w-full sm:w-auto" disabled={refreshing}>
-                    <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-                    Sync Data
-                </Button>
+                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                    <Button onClick={handleDeepSync} variant="outline" className="border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10 text-emerald-500 text-xs h-9" disabled={refreshing || vaults.length === 0}>
+                        Deep Sync DB
+                    </Button>
+                    <Button onClick={loadData} variant="outline" className="border-white/5 bg-white/5 h-9" disabled={refreshing}>
+                        <RefreshCw className={`w-3.5 h-3.5 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                        Sync UI
+                    </Button>
+                </div>
             </header>
 
             {/* KPI Grid */}
@@ -240,15 +225,6 @@ export default function AdminDashboard() {
                                                 title="View Transaction"
                                             >
                                                 <ExternalLink size={12} className="text-blue-400" />
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className="h-7 w-7 p-0 hover:bg-white/10"
-                                                onClick={() => handleExportReceipt(r)}
-                                                title="Download Receipt"
-                                            >
-                                                <FileText size={12} className="text-emerald-400" />
                                             </Button>
                                         </div>
                                     </div>

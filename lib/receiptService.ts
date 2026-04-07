@@ -20,7 +20,6 @@ export interface Receipt {
     verified: boolean;
     type: 'created' | 'breaked' | 'completed';
     penalty?: string;
-    proofRailsId?: string;
 }
 
 const RECEIPTS_COLLECTION = 'receipts';
@@ -141,8 +140,7 @@ export async function migrateLocalStorageToFirestore(walletAddress: string): Pro
                                 amount: parsed.amount,
                                 verified: parsed.verified || false,
                                 type: parsed.type || 'created',
-                                penalty: parsed.penalty,
-                                proofRailsId: parsed.id
+                                penalty: parsed.penalty
                             });
 
                             migratedCount++;
@@ -176,9 +174,16 @@ export interface SavedVault {
     beneficiary?: string; // Emergency Beneficiary
 }
 
+import { ensureUserExists } from './userService';
+
 export async function saveVault(data: SavedVault): Promise<string> {
     try {
         const normalizedAddress = data.vaultAddress.toLowerCase();
+        const ownerAddress = data.owner.toLowerCase();
+
+        // Ensure user record exists for this wallet
+        await ensureUserExists(ownerAddress);
+
         const vaultsRef = collection(db, VAULTS_COLLECTION);
         const q = query(vaultsRef, where('vaultAddress', '==', normalizedAddress));
         const snapshot = await getDocs(q);

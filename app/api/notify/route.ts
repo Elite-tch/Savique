@@ -11,7 +11,6 @@ export async function POST(req: NextRequest) {
             amount,
             txHash,
             unlockDate,
-            proofRailsId,
             daysRemaining,
             targetAmount,
             currentBalance
@@ -30,7 +29,6 @@ export async function POST(req: NextRequest) {
             amount: amount || '0',
             txHash,
             unlockDate,
-            proofRailsId,
             daysRemaining,
             targetAmount,
             currentBalance

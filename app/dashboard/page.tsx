@@ -106,8 +106,8 @@ export default function Dashboard() {
 
                     // 3. Merge and normalize to lowercase to prevent deduplication failure (Checksum vs Lowercase)
                     const uniqueVaults = Array.from(new Set([
-                        ...dbVaults.map(v => v.toLowerCase()),
-                        ...chainVaults.map(v => v.toLowerCase())
+                        ...chainVaults.map(v => v.toLowerCase()),
+                        ...dbVaults.map(v => v.toLowerCase())
                     ]));
                     setVaultAddresses(uniqueVaults);
 
@@ -176,16 +176,8 @@ export default function Dashboard() {
         return false;
     }).length;
 
-    // Derived active list for Recent Vaults
-    const activeVaultList = (vaultAddresses || []).filter((_, index) => {
-        const res = vaultBalances?.[index];
-        if (res?.status === 'success' && res.result) {
-            return (res.result as bigint) > BigInt(0);
-        }
-        return false;
-    });
-
-    const recentActiveVaults = [...activeVaultList].slice(0, 3);
+    // Get the 3 most recent vaults regardless of balance or status
+    const recentVaults = (vaultAddresses || []).slice(0, 3);
 
     // Calculate Active and Completed vaults based on balance
     let activeVaultCount = 0;
@@ -326,21 +318,21 @@ export default function Dashboard() {
                             <div className="w-full h-full" />
                         </Card>
                     ))
-                ) : recentActiveVaults.length === 0 ? (
+                ) : recentVaults.length === 0 ? (
                     <Card className="border-dashed border-white/10 bg-transparent flex flex-col items-center justify-center p-12 text-center col-span-full h-64">
                         <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-4">
                             <Lock className="w-8 h-8 text-gray-500" />
                         </div>
-                        <h3 className="text-lg font-medium text-white">No Active Savings</h3>
+                        <h3 className="text-lg font-medium text-white">No Savings Found</h3>
                         <p className="text-gray-400 mb-6 max-w-sm">
-                            You don't have any active savings plans yet. Start by creating a personal savings.
+                            You don't have any savings plans yet. Start by creating your first savings vault.
                         </p>
                         <Link href="/dashboard/create">
                             <Button variant="outline" className="border-white/20 hover:bg-white/10">Get Started</Button>
                         </Link>
                     </Card>
                 ) : (
-                    recentActiveVaults.map((vaultAddr, index) => (
+                    recentVaults.map((vaultAddr, index) => (
                         <VaultPreviewCard key={vaultAddr} address={vaultAddr as `0x${string}`} index={index} />
                     ))
                 )}

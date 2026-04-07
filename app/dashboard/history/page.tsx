@@ -6,12 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Receipt as ReceiptIcon, ExternalLink, CheckCircle, Calendar, Clock, Wallet, Download, FileText, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAccount } from "wagmi";
-import { getReceiptsByWallet, Receipt, saveReceipt, getVaultByAddress, SavedVault, updateReceipt, saveVault } from "@/lib/receiptService";
-import { StatementExportModal } from "@/components/StatementExportModal";
-import { jsPDF } from "jspdf";
+import { getReceiptsByWallet, Receipt } from "@/lib/receiptService";
 import { toast } from "sonner";
-import { generateReceiptPDF } from "../../../lib/pdfGenerator";
-import { saveAs } from "file-saver";
 
 export default function HistoryPage() {
     const { address: currentAddress, isConnected, isConnecting, isReconnecting } = useAccount();
@@ -19,24 +15,6 @@ export default function HistoryPage() {
 
     const [receipts, setReceipts] = useState<Receipt[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [isGeneratingReceiptId, setIsGeneratingReceiptId] = useState<string | null>(null);
-    const [isStatementModalOpen, setIsStatementModalOpen] = useState(false);
-
-    const generatePDF = async (receipt: Receipt) => {
-        setIsGeneratingReceiptId(receipt.id || null);
-        const toastId = toast.loading("Preparing your receipt...");
-
-        try {
-            const blob = await generateReceiptPDF(receipt);
-            saveAs(blob, `Savique-Receipt-${receipt.id?.slice(0, 8)}.pdf`);
-            toast.success("Receipt downloaded!", { id: toastId });
-        } catch (error) {
-            console.error("PDF generation failed", error);
-            toast.error("Generation failed", { id: toastId });
-        } finally {
-            setIsGeneratingReceiptId(null);
-        }
-    };
 
     useEffect(() => {
         const loadReceipts = async () => {
@@ -90,29 +68,10 @@ export default function HistoryPage() {
             <div className="flex md:items-center justify-between md:flex-row flex-col gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-white mb-2">Transaction History</h1>
-                    <p className="text-gray-400">View your ProofRails verified transaction receipts</p>
+                    <p className="text-gray-400">View your transaction history on the network</p>
                 </div>
-
-                {receipts.length > 0 && (
-                    <Button
-                        onClick={() => setIsStatementModalOpen(true)}
-                        className="gap-2 bg-primary hover:bg-primary/90 w-fit md:w-auto"
-                    >
-                        <FileText className="w-4 h-4" />
-                        Export Statement
-                    </Button>
-                )}
             </div>
 
-            {/* Statement Export Modal */}
-            {currentAddress && (
-                <StatementExportModal
-                    isOpen={isStatementModalOpen}
-                    onClose={() => setIsStatementModalOpen(false)}
-                    receipts={receipts}
-                    walletAddress={currentAddress}
-                />
-            )}
 
             {isLoading ? (
                 <div className="grid grid-cols-1 gap-4">
@@ -129,7 +88,7 @@ export default function HistoryPage() {
                     </div>
                     <h3 className="text-xl font-medium text-white mb-2">No Receipts Yet</h3>
                     <p className="text-gray-400 max-w-sm mx-auto">
-                        Create your first savings to start generating verified ProofRails receipts
+                        Create your first savings to start generating transaction receipts
                     </p>
                 </Card>
             ) : (
@@ -198,35 +157,6 @@ export default function HistoryPage() {
                                                 <ExternalLink className="w-3 h-3" />
                                                 Explorer
                                             </Button>
-
-                                            <Button
-                                                size="sm"
-                                                variant="ghost"
-                                                onClick={() => generatePDF(receipt)}
-                                                disabled={isGeneratingReceiptId === receipt.id}
-                                                className="gap-2 text-zinc-400 hover:text-white"
-                                            >
-                                                {isGeneratingReceiptId === receipt.id ? (
-                                                    <Loader2 className="w-3 h-3 animate-spin" />
-                                                ) : (
-                                                    <Download className="w-3 h-3" />
-                                                )}
-                                                PDF
-                                            </Button>
-
-                                            {receipt.verified && receipt.proofRailsId ? (
-                                                <div className="px-3 py-2 bg-green-500/10 border border-green-500/20 rounded-md flex items-center gap-2">
-                                                    <CheckCircle className="w-3 h-3 text-green-500" />
-                                                    <button
-                                                        onClick={() => window.open(`https://proofrails-clone-middleware.onrender.com/receipt/${receipt.proofRailsId}`, '_blank')}
-                                                        className="text-xs cursor-pointer text-green-400 font-medium bg-transparent hover:underline">ProofRails Verified </button>
-                                                </div>
-                                            ) : (
-                                                <div className="px-3 py-2 bg-orange-500/10 border border-orange-500/20 rounded-md flex items-center gap-2">
-                                                    <Clock className="w-4 h-4 text-orange-400" />
-                                                    <span className="text-xs text-orange-400 font-medium">Pending</span>
-                                                </div>
-                                            )}
                                         </div>
                                     </div>
                                 </div>

@@ -14,7 +14,6 @@ import {
     ExternalLink,
     Trophy
 } from "lucide-react";
-import { generateStatement } from "@/lib/statementGenerator";
 import { toast } from "sonner";
 
 const ITEMS_PER_PAGE = 8;
@@ -50,42 +49,6 @@ export default function CompletedGoalsPage() {
     const paginatedList = filteredList.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
     const totalPages = Math.ceil(filteredList.length / ITEMS_PER_PAGE);
 
-    const handleExportReceipt = (receipt: Receipt) => {
-        const toastId = toast.loading("Preparing success evidence...");
-
-        const createWithQR = (qrData?: string) => {
-            try {
-                generateStatement({
-                    receipts: [receipt],
-                    walletAddress: receipt.walletAddress,
-                    startDate: new Date(receipt.timestamp),
-                    endDate: new Date(receipt.timestamp),
-                    qrImageData: qrData
-                });
-                toast.success("Success Evidence PDF generated", { id: toastId });
-            } catch (e) {
-                toast.error("Failed to generate PDF", { id: toastId });
-            }
-        };
-
-        if (receipt.proofRailsId) {
-            const img = new Image();
-            img.crossOrigin = "Anonymous";
-            img.src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://proofrails-clone-middleware.onrender.com/receipt/${receipt.proofRailsId}`;
-            img.onload = () => {
-                const canvas = document.createElement("canvas");
-                canvas.width = img.width;
-                canvas.height = img.height;
-                const ctx = canvas.getContext("2d");
-                ctx?.drawImage(img, 0, 0);
-                const dataURL = canvas.toDataURL("image/png");
-                createWithQR(dataURL);
-            };
-            img.onerror = () => createWithQR();
-        } else {
-            createWithQR();
-        }
-    };
 
     return (
         <div className="space-y-6">
@@ -146,9 +109,6 @@ export default function CompletedGoalsPage() {
                                             <div className="flex justify-end gap-2 text-[10px]">
                                                 <Button variant="ghost" size="sm" className="h-7 gap-1" onClick={() => window.open(`https://coston2-explorer.flare.network/tx/${receipt.txHash}`, '_blank')}>
                                                     <ExternalLink size={12} /> TX
-                                                </Button>
-                                                <Button variant="ghost" size="sm" className="h-7 gap-1 text-emerald-400" onClick={() => handleExportReceipt(receipt)}>
-                                                    <FileText size={12} /> PDF
                                                 </Button>
                                             </div>
                                         </td>

@@ -7,7 +7,6 @@ import { VAULT_ABI } from "@/lib/contracts";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { useProofRails } from "@proofrails/sdk/react";
 import { saveReceipt } from "@/lib/receiptService";
 import { createNotification } from "@/lib/notificationService";
 import { getUserProfile } from "@/lib/userService";
@@ -43,9 +42,7 @@ export function VaultBreakModal({
     const { writeContract, data: hash, isPending: isWritePending, error: writeError } = useWriteContract();
     const { isLoading: isConfirming, isSuccess, data: receipt } = useWaitForTransactionReceipt({ hash });
 
-    // ProofRails Integration
-    const sdk = useProofRails();
-    const [isGeneratingProof, setIsGeneratingProof] = useState(false);
+    const [isFinalizing, setIsFinalizing] = useState(false);
 
     // Toast control
     const toastId = useRef<string | number | null>(null);
@@ -77,75 +74,15 @@ export function VaultBreakModal({
     }, [writeError]);
 
     useEffect(() => {
-        if (isSuccess && hash && receipt && !isGeneratingProof) {
+        if (isSuccess && hash && receipt && !isFinalizing) {
             if (toastId.current) toast.dismiss(toastId.current);
-            setIsGeneratingProof(true);
+            setIsFinalizing(true);
 
             toast.success("Transaction Successful", toastStyle);
 
-            const generateReceipt = async () => {
+            const finalizeBreak = async () => {
                 try {
-                    // Generate ProofRails Receipt
-                    const receiptResult = await sdk.templates.payment({
-                        amount: amountToReceive,
-                        from: address, // Vault
-                        to: receipt.from, // User (initiator)
-                        purpose: `Savings Broken: ${purpose}`,
-                        transactionHash: receipt.transactionHash
-                    });
-
                     // Save "Breaked" receipt to Firestore
-                    await saveReceipt({
-                        walletAddress: userAddress!.toLowerCase(),
-                        vaultAddress: address,
-                        txHash: receipt.transactionHash,
-                        timestamp: Date.now(),
-                        purpose: purpose || "Savings Broken",
-                        amount: amountToReceive.toFixed(2),
-                        penalty: penaltyAmount.toFixed(2),
-                        type: 'breaked',
-                        verified: !!receiptResult?.id,
-                        proofRailsId: receiptResult?.id
-                    });
-
-                    await createNotification(
-                        userAddress!,
-                        "Savings Broken & Verified",
-                        `You broke "${purpose}" early. Your digital receipt is verified. Penalty applied.`,
-                        'warning',
-                        '/dashboard/history',
-                        receiptResult?.id
-                    );
-
-                    // Send Professional Email Notification
-                    try {
-                        const profile = await getUserProfile(userAddress!);
-                        if (profile?.email && profile.notificationPreferences.withdrawals) {
-                            await fetch('/api/notify', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    type: 'SAVINGS_BROKEN',
-                                    userEmail: profile.email,
-                                    purpose: purpose,
-                                    amount: amountToReceive.toFixed(2),
-                                    txHash: receipt.transactionHash,
-                                    proofRailsId: receiptResult?.id
-                                })
-                            });
-                        }
-                    } catch (emailErr) {
-                        console.warn('[Email] Failed to send break notification:', emailErr);
-                    }
-
-                    toast.success("Receipt Generated", toastStyle);
-                    onClose();
-                    router.push("/dashboard/savings");
-                } catch (error) {
-                    console.error("Failed to generate receipt:", error);
-                    toast.error("Receipt Generation Failed", toastStyle);
-
-                    // Fallback: save to Firestore even on error
                     await saveReceipt({
                         walletAddress: userAddress!.toLowerCase(),
                         vaultAddress: address,
@@ -158,19 +95,18 @@ export function VaultBreakModal({
                         verified: false
                     });
 
-                    // Notify user even on error
                     await createNotification(
                         userAddress!,
-                        "Savings Broken - Receipt Pending",
-                        `Savings "${purpose}" broken successfully. Funds transferred, receipt will verify automatically soon.`,
-                        'info',
+                        "Savings Broken",
+                        `You broke "${purpose}" early. Funds recovered with penalty applied.`,
+                        'warning',
                         '/dashboard/history'
                     );
 
-                    // Still send email even if ProofRails fails
+                    // Send Professional Email Notification
                     try {
                         const profile = await getUserProfile(userAddress!);
-                        if (profile?.email && profile.notificationPreferences.withdrawals) {
+                        if (profile?.email && (!profile.notificationPreferences || profile.notificationPreferences.withdrawals)) {
                             await fetch('/api/notify', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
@@ -187,14 +123,20 @@ export function VaultBreakModal({
                         console.warn('[Email] Failed to send break notification:', emailErr);
                     }
 
+                    toast.success("Processed Successfully", toastStyle);
+                    onClose();
+                    router.push("/dashboard/savings");
+                } catch (error) {
+                    console.error("Failed to finalize break:", error);
+                    toast.error("Process Failed", toastStyle);
                     onClose();
                     router.push("/dashboard/savings");
                 }
             };
 
-            generateReceipt();
+            finalizeBreak();
         }
-    }, [isSuccess, router, onClose, hash, receipt, amountToReceive, penaltyAmount, purpose, sdk, isGeneratingProof]);
+    }, [isSuccess, router, onClose, hash, receipt, amountToReceive, penaltyAmount, purpose, isFinalizing, userAddress, address, toastStyle]);
 
 
     if (!isOpen) return null;

@@ -11,7 +11,6 @@ import { useWriteContract, useWaitForTransactionReceipt, useAccount, useBalance,
 import { CONTRACTS, VAULT_FACTORY_ABI, ERC20_ABI, VAULT_ABI } from "@/lib/contracts";
 import { toast } from "sonner";
 import { parseUnits, formatUnits, decodeEventLog } from "viem";
-import { useProofRails } from "@proofrails/sdk/react";
 import { saveReceipt, saveVault } from "@/lib/receiptService";
 import { createNotification } from "@/lib/notificationService";
 import { getUserProfile } from "@/lib/userService";
@@ -139,7 +138,6 @@ export default function CreatePersonalVault() {
         data: receipt
     } = useWaitForTransactionReceipt({ hash: txHash });
 
-    const sdk = useProofRails();
 
     // Reset loop when transaction succeeds
     useEffect(() => {
@@ -187,7 +185,7 @@ export default function CreatePersonalVault() {
                             toast.success("Savings Created!", toastStyle);
                             setTxHash(undefined);
                             setCurrentStep('generating_proof');
-                            handleProofGeneration(receipt.transactionHash, newVault);
+                            handleFinalize(receipt.transactionHash, newVault);
                         } else {
                             throw new Error("Could not find new savings address");
                         }
@@ -329,7 +327,7 @@ export default function CreatePersonalVault() {
         }
     };
 
-    const handleProofGeneration = async (txHashStr: string, vaultAddrOverride?: string) => {
+    const handleFinalize = async (txHashStr: string, vaultAddrOverride?: string) => {
         const targetVault = (vaultAddrOverride || createdVaultAddress) as `0x${string}`;
 
         try {
@@ -342,135 +340,6 @@ export default function CreatePersonalVault() {
                 targetAmount: formData.targetAmount || formData.amount,
                 beneficiary: formData.beneficiary || ""
             });
-        } catch (dbError) {
-            console.error("❌ Failed to save savings to registry:", dbError);
-        }
-
-        try {
-            const receiptResult = await sdk.templates.payment({
-                amount: parseFloat(formData.amount),
-                from: address!,
-                to: targetVault,
-                purpose: `Safira: ${formData.purpose}`,
-                transactionHash: txHashStr
-            });
-
-            await createNotification(
-                address!,
-                "Savings Created & Verified",
-                `Your Savings "${formData.purpose}" has been secured and your digital receipt is verified.`,
-                'success',
-                `/dashboard/savings/${targetVault}`,
-                receiptResult.id
-            );
-
-            const unlockDateStr = new Date(unlockDate).toLocaleDateString('en-US', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-            });
-
-            try {
-                const profile = await getUserProfile(address!);
-                console.log("[Email] Profile fetched:", profile?.email);
-
-                // Add safety check for notificationPreferences
-                const canSendEmail = profile?.email && (
-                    !profile.notificationPreferences || // default to true if missing
-                    profile.notificationPreferences.deposits
-                );
-
-                if (canSendEmail) {
-                    console.log("[Email] Sending DEPOSIT_CONFIRMED notification...");
-                    const response = await fetch('/api/notify', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            type: 'DEPOSIT_CONFIRMED',
-                            userEmail: profile.email,
-                            purpose: formData.purpose,
-                            amount: formData.amount,
-                            txHash: txHashStr,
-                            unlockDate: unlockDateStr,
-                            proofRailsId: receiptResult.id,
-                            targetAmount: formData.targetAmount || formData.amount
-                        })
-                    });
-                    const result = await response.json();
-                    console.log("[Email] Notification response:", result);
-                } else {
-                    console.log("[Email] Notification skipped:", {
-                        hasEmail: !!profile?.email,
-                        depositsPref: profile?.notificationPreferences?.deposits
-                    });
-                }
-            } catch (emailErr) {
-                console.error("[Email] Error in handleProofGeneration email flow:", emailErr);
-            }
-
-            await saveReceipt({
-                walletAddress: address!.toLowerCase(),
-                vaultAddress: targetVault,
-                txHash: txHashStr,
-                timestamp: Date.now(),
-                purpose: formData.purpose,
-                amount: formData.amount,
-                verified: !!receiptResult?.id,
-                type: 'created',
-                proofRailsId: receiptResult?.id
-            });
-
-            setCurrentStep('done');
-            toast.success("All Done! Savings Created.", toastStyle);
-            setTimeout(() => router.push("/dashboard/savings"), 1500);
-        } catch (e: any) {
-            console.error("❌ Proof generation failed:", e);
-
-            // Calculate unlock date for fallback email as well
-            const unlockDateStr = new Date(unlockDate).toLocaleDateString('en-US', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-            });
-
-            // Fallback email sending even if ProofRails fails
-            try {
-                const profile = await getUserProfile(address!);
-                console.log("[Email Fallback] Profile fetched:", profile?.email);
-
-                const canSendEmail = profile?.email && (
-                    !profile.notificationPreferences || // default to true if missing
-                    profile.notificationPreferences.deposits
-                );
-
-                if (canSendEmail) {
-                    console.log("[Email Fallback] Sending DEPOSIT_CONFIRMED notification...");
-                    const response = await fetch('/api/notify', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            type: 'DEPOSIT_CONFIRMED',
-                            userEmail: profile.email,
-                            purpose: formData.purpose,
-                            amount: formData.amount,
-                            txHash: txHashStr,
-                            unlockDate: unlockDateStr,
-                            targetAmount: formData.targetAmount || formData.amount
-                        })
-                    });
-                    const result = await response.json();
-                    console.log("[Email Fallback] Notification response:", result);
-                } else {
-                    console.log("[Email Fallback] Notification skipped:", {
-                        hasEmail: !!profile?.email,
-                        depositsPref: profile?.notificationPreferences?.deposits
-                    });
-                }
-            } catch (emailErr) {
-                console.error("[Email Fallback] Error in handleProofGeneration email flow:", emailErr);
-            }
 
             await saveReceipt({
                 walletAddress: address!.toLowerCase(),
@@ -485,14 +354,44 @@ export default function CreatePersonalVault() {
 
             await createNotification(
                 address!,
-                "Savings Created - Receipt Pending",
-                `Your Savings "${formData.purpose}" is active, but your digital receipt is still processing.`,
-                'info',
+                "Savings Created",
+                `Your Savings "${formData.purpose}" has been successfully secured.`,
+                'success',
                 `/dashboard/savings/${targetVault}`
             );
 
+            const unlockDateStr = new Date(unlockDate).toLocaleDateString('en-US', {
+                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+            });
+
+            try {
+                const profile = await getUserProfile(address!);
+                if (profile?.email && (!profile.notificationPreferences || profile.notificationPreferences.deposits)) {
+                    await fetch('/api/notify', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            type: 'DEPOSIT_CONFIRMED',
+                            userEmail: profile.email,
+                            purpose: formData.purpose,
+                            amount: formData.amount,
+                            txHash: txHashStr,
+                            unlockDate: unlockDateStr,
+                            targetAmount: formData.targetAmount || formData.amount
+                        })
+                    });
+                }
+            } catch (emailErr) {
+                console.error("[Email] Error in handleFinalize email flow:", emailErr);
+            }
+
             setCurrentStep('done');
-            setTimeout(() => router.push("/dashboard/savings"), 2000);
+            toast.success("Ready! Savings Created.", toastStyle);
+            setTimeout(() => router.push("/dashboard/savings"), 1500);
+        } catch (e) {
+            console.error("❌ Finalization failed:", e);
+            toast.error("Failed to register savings in database.", toastStyle);
+            setCurrentStep('idle');
         }
     };
 
@@ -523,7 +422,7 @@ export default function CreatePersonalVault() {
     const getButtonText = () => {
         if (currentStep === 'creating') return "Creating Savings...";
         if (currentStep === 'approving') return "Approving USDT0...";
-        if (currentStep === 'generating_proof') return "Finalizing Receipt...";
+        if (currentStep === 'generating_proof') return "Finalizing Savings...";
         if (currentStep === 'done') return "Redirecting...";
         return "Create & Lock Funds";
     };

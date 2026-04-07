@@ -134,17 +134,6 @@ export function NotificationBell() {
                                                             View Details <ExternalLink className="w-3 h-3" />
                                                         </Link>
                                                     )}
-                                                    {notification.receiptId && (
-                                                        <a
-                                                            href={`https://proofrails-clone-middleware.onrender.com/receipt/${notification.receiptId}`}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            className="inline-flex items-center gap-1 text-xs text-gray-400 border- hover:text-white hover:underline"
-                                                            onClick={(e) => e.stopPropagation()}
-                                                        >
-                                                            View Receipt <ExternalLink className="w-3 h-3" />
-                                                        </a>
-                                                    )}
                                                 </div>
                                             </div>
                                             {!notification.read && (

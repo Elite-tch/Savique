@@ -31,7 +31,6 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { useAccount } from "wagmi";
 import { getReceiptsByWallet, Receipt } from "@/lib/receiptService";
-import { generateStatement } from "@/lib/statementGenerator";
 import { toast } from "sonner";
 
 // Recharts for Visualization
@@ -169,24 +168,6 @@ export default function AnalysisPage() {
         ];
     }, [stats.activeBalance]);
 
-    const quickExport = (period: number) => {
-        const start = new Date();
-        start.setDate(start.getDate() - period);
-        const filtered = receipts.filter(r => new Date(r.timestamp) >= start);
-
-        if (filtered.length === 0) {
-            toast.error("No transactions in this period");
-            return;
-        }
-
-        generateStatement({
-            receipts: filtered,
-            walletAddress: currentAddress || "",
-            startDate: start,
-            endDate: new Date()
-        });
-        toast.success("Statement exported!");
-    };
 
     if (!isConnected) {
         return (
@@ -194,7 +175,7 @@ export default function AnalysisPage() {
                 <Card className="p-12 text-center max-w-md bg-white/5 border-zinc-800">
                     <Wallet className="w-16 h-16 text-gray-500 mx-auto mb-4" />
                     <h2 className="text-2xl font-bold text-white mb-2">Connect Your Wallet</h2>
-                    <p className="text-gray-400">Unlock your financial insights with ProofRails verification.</p>
+                    <p className="text-gray-400">Unlock your financial insights with on-chain verification.</p>
                 </Card>
             </div>
         );
@@ -288,7 +269,7 @@ export default function AnalysisPage() {
                 {/* Distribution & Type Summary */}
                 <Card className="p-8 bg-zinc-900/50 border-white/5 flex flex-col">
                     <h3 className="text-xl font-bold text-white mb-2">Audit Distribution</h3>
-                    <p className="text-xs text-gray-500 mb-8">ProofRails event classification</p>
+                    <p className="text-xs text-gray-500 mb-8">Transaction event classification</p>
 
                     <div className="h-[250px] w-full flex-1">
                         <ResponsiveContainer width="100%" height="100%">
