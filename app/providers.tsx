@@ -131,7 +131,22 @@ export default function Providers({ children }: { children: React.ReactNode }) {
                         <WalletSync />
                         <WelcomeToast />
                         {children}
-                        <Toaster position="top-right" theme="dark" richColors closeButton />
+                        <Toaster 
+                            position="top-right" 
+                            theme="dark" 
+                            closeButton 
+                            toastOptions={{
+                                classNames: {
+                                    toast: 'bg-primary hover:bg-primary/95 border-none shadow-2xl text-white font-medium rounded-xl',
+                                    title: 'text-white font-bold text-sm',
+                                    description: 'text-white/80 text-xs',
+                                    closeButton: 'bg-white/10 text-white border border-white/20 hover:bg-white hover:text-primary transition-colors',
+                                    icon: 'text-white',
+                                    actionButton: 'bg-white text-primary hover:bg-white/90 font-bold',
+                                    cancelButton: 'bg-white/10 text-white hover:bg-white/20',
+                                }
+                            }}
+                        />
                     </>
                 </RainbowKitProvider>
             </QueryClientProvider>
