@@ -1,26 +1,38 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "./IVaultFactory.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
  * @title AbstractVault
- * @dev Base contract for all SafeVault types. 
- *      simplified to handle ONLY Native C2FLR.
+ * @dev Base contract for all Savique Vault types.
+ *      Ownership is tied to an NFT on the VaultFactory.
  */
-abstract contract AbstractVault is Ownable, ReentrancyGuard {
-    
+abstract contract AbstractVault is ReentrancyGuard {
+    address public immutable factory;
+    uint256 public immutable tokenId;
     string public purpose;
     
     // Events
     event Deposited(address indexed user, uint256 amount, uint256 timestamp);
     event Withdrawn(address indexed user, uint256 amount, uint256 timestamp, string typeOfWithdrawal);
-    event VaultInitialized(string purpose);
+    event VaultInitialized(string purpose, uint256 indexed tokenId);
 
-    constructor(string memory _purpose, address _owner) Ownable(_owner) {
+    modifier onlyVaultOwner() {
+        require(owner() == msg.sender, "Not vault owner");
+        _;
+    }
+
+    function owner() public view returns (address) {
+        return IVaultFactory(factory).ownerOf(tokenId);
+    }
+
+    constructor(string memory _purpose, address _factory, uint256 _tokenId) {
+        factory = _factory;
+        tokenId = _tokenId;
         purpose = _purpose;
-        emit VaultInitialized(_purpose);
+        emit VaultInitialized(_purpose, _tokenId);
     }
 
     /**

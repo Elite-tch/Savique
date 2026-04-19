@@ -14,6 +14,7 @@ import { parseUnits, formatUnits, decodeEventLog } from "viem";
 import { saveReceipt, saveVault } from "@/lib/receiptService";
 import { createNotification } from "@/lib/notificationService";
 import { getUserProfile } from "@/lib/userService";
+import { proofRailsService } from "@/lib/proofRailsService";
 
 const MAX_UINT256 = BigInt("115792089237316195423570985008687907853269984665640564039457584007913129639935");
 
@@ -341,6 +342,22 @@ export default function CreatePersonalVault() {
                 beneficiary: formData.beneficiary || ""
             });
 
+            // 3. Record on ProofRails ISO Ledger
+            let prId = "";
+            try {
+                const prRes = await proofRailsService.recordTransaction({
+                    amount: formData.amount,
+                    currency: "USDT0",
+                    txHash: txHashStr,
+                    sender: address!,
+                    receiver: targetVault,
+                    reference: formData.purpose || "Initial Deposit"
+                });
+                prId = prRes?.receipt_id || "";
+            } catch (prErr) {
+                console.warn("[ProofRails] Integration bypassed:", prErr);
+            }
+
             await saveReceipt({
                 walletAddress: address!.toLowerCase(),
                 vaultAddress: targetVault,
@@ -349,7 +366,8 @@ export default function CreatePersonalVault() {
                 purpose: formData.purpose,
                 amount: formData.amount,
                 verified: false,
-                type: 'created'
+                type: 'created',
+                proofRailsId: prId
             });
 
             await createNotification(

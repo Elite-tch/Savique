@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { Bell, Check, Info, AlertTriangle, CheckCircle, ExternalLink } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useAccount } from 'wagmi';
+import { useAccount, usePublicClient } from 'wagmi';
 import { AppNotification, subscribeToNotifications, markAsRead, markAllAsRead } from '@/lib/notificationService';
 import Link from 'next/link';
 
 export function NotificationBell() {
     const { address } = useAccount();
+    const publicClient = usePublicClient();
     const [notifications, setNotifications] = useState<AppNotification[]>([]);
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
@@ -26,12 +27,32 @@ export function NotificationBell() {
     useEffect(() => {
         if (!address) return;
         console.log('[NotificationBell] Subscribing for:', address);
-        const unsubscribe = subscribeToNotifications(address, (data) => {
-            console.log('[NotificationBell] Received notifications:', data);
-            setNotifications(data);
+        const unsubscribe = subscribeToNotifications(address, async (data) => {
+            if (!publicClient) {
+                setNotifications(data);
+                return;
+            }
+
+            console.log('[NotificationBell] Filtering cross-chain notifications...');
+            const valid = [];
+            for (const n of data) {
+                 // Check if notification is related to a specific vault
+                 const match = n.link?.match(/0x[a-fA-F0-9]{40}/);
+                 if (match) {
+                     try {
+                         const bytecode = await publicClient.getBytecode({ address: match[0] as `0x${string}` });
+                         // Skip if contract doesn't exist on current chain (e.g. from Arbitrum while on Flare)
+                         if (!bytecode || bytecode === '0x') continue;
+                     } catch (e) {
+                         continue;
+                     }
+                 }
+                 valid.push(n);
+            }
+            setNotifications(valid);
         });
         return () => unsubscribe();
-    }, [address]);
+    }, [address, publicClient]);
 
     const unreadCount = notifications.filter(n => !n.read).length;
 

@@ -19,10 +19,19 @@ async function main() {
     const protocolTreasury = deployer.address;
     console.log(" Protocol Treasury:", protocolTreasury, "\n");
 
+    // Deploy VaultMetadata
+    console.log(" Deploying VaultMetadata...");
+    const VaultMetadata = await ethers.getContractFactory("VaultMetadata");
+    const metadata = await VaultMetadata.deploy();
+    await metadata.waitForDeployment();
+
+    const metadataAddress = await metadata.getAddress();
+    console.log(" VaultMetadata deployed to:", metadataAddress);
+
     // Deploy VaultFactory
     console.log(" Deploying VaultFactory...");
     const VaultFactory = await ethers.getContractFactory("VaultFactory");
-    const factory = await VaultFactory.deploy(USDT_ADDRESS, protocolTreasury);
+    const factory = await VaultFactory.deploy(USDT_ADDRESS, protocolTreasury, metadataAddress);
     await factory.waitForDeployment();
 
     const factoryAddress = await factory.getAddress();
@@ -30,6 +39,7 @@ async function main() {
 
     const fs = require("fs");
     fs.writeFileSync("deployed_factory.txt", factoryAddress);
+    fs.appendFileSync("deployed_factory.txt", `\nVaultMetadata: ${metadataAddress}`);
 
     console.log("\n🎉 Deployment Complete!\n");
     console.log(" Summary:");

@@ -17,7 +17,6 @@ contract PersonalVault is AbstractVault {
     uint256 public penaltyBps; // Basis points (e.g. 500 = 5%)
     address public treasury; // Address to receive penalties
     address public beneficiary; // Emergency beneficiary
-    address public factory; // Factory that deployed this vault
     uint256 public constant GRACE_PERIOD = 5 minutes; // TESTING (Production: 365 days)
 
     event EarlyWithdrawal(address indexed user, uint256 amountWithdraw, uint256 penaltyPaid);
@@ -27,12 +26,12 @@ contract PersonalVault is AbstractVault {
     constructor(
         address _token,
         string memory _purpose,
-        address _owner,
+        uint256 _tokenId,
         uint256 _unlockTimestamp,
         uint256 _penaltyBps,
         address _treasury,
         address _beneficiary
-    ) AbstractVault(_purpose, _owner) {
+    ) AbstractVault(_purpose, msg.sender, _tokenId) {
         require(_token != address(0), "Invalid token address");
         require(_unlockTimestamp > block.timestamp, "Unlock time must be in future");
         require(_penaltyBps <= 10000, "Invalid basis points");
@@ -42,14 +41,13 @@ contract PersonalVault is AbstractVault {
         penaltyBps = _penaltyBps;
         treasury = _treasury;
         beneficiary = _beneficiary;
-        factory = msg.sender;
     }
 
     /**
      * @dev Deposit ERC-20 tokens into the vault
      * @param amount Amount of tokens to deposit
      */
-    function deposit(uint256 amount) external onlyOwner nonReentrant {
+    function deposit(uint256 amount) external onlyVaultOwner nonReentrant {
         require(amount > 0, "Amount must be greater than 0");
         
         // Transfer tokens from user to vault
@@ -77,7 +75,7 @@ contract PersonalVault is AbstractVault {
     /**
      * @dev Withdraws entire token balance
      */
-    function withdraw() external onlyOwner nonReentrant {
+    function withdraw() external onlyVaultOwner nonReentrant {
         uint256 balance = token.balanceOf(address(this));
         require(balance > 0, "No funds to withdraw");
 
@@ -102,6 +100,9 @@ contract PersonalVault is AbstractVault {
             emit Withdrawn(msg.sender, remaining, block.timestamp, "EARLY_EXIT");
             emit EarlyWithdrawal(msg.sender, remaining, penalty);
         }
+
+        // AUTO-BURN: Destroy the NFT after full withdrawal
+        IVaultFactory(factory).burnVaultNFT(tokenId);
     }
 
     /**
@@ -109,6 +110,13 @@ contract PersonalVault is AbstractVault {
      */
     function totalAssets() public view override returns (uint256) {
         return token.balanceOf(address(this));
+    }
+
+    /**
+     * @dev Triggered on every deposit to update the NFT's version/timestamp
+     */
+    function _onDeposit(address /*_user*/, uint256 /*_amount*/) internal override {
+        IVaultFactory(factory).notifyUpdate(tokenId);
     }
 
     /**
@@ -124,5 +132,8 @@ contract PersonalVault is AbstractVault {
 
         token.safeTransfer(beneficiary, balance);
         emit BeneficiaryClaimed(beneficiary, balance);
+
+        // AUTO-BURN: Destroy the NFT after beneficiary claim
+        IVaultFactory(factory).burnVaultNFT(tokenId);
     }
 }

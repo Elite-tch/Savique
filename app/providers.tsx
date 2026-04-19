@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from 'react';
 import '@rainbow-me/rainbowkit/styles.css';
 import {
     connectorsForWallets,
@@ -20,6 +21,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { http } from "viem";
 import { Toaster } from "sonner";
 import { AutoDisconnect } from "@/components/AutoDisconnect";
+import { WalletSync } from "@/components/WalletSync";
+import { WelcomeToast } from "@/components/WelcomeToast";
 
 export const flare = defineChain({
     id: 14,
@@ -124,7 +127,9 @@ export default function Providers({ children }: { children: React.ReactNode }) {
                     })}
                 >
                     <>
-                        <AutoDisconnect />
+                       <AutoDisconnect /> 
+                        <WalletSync />
+                        <WelcomeToast />
                         {children}
                         <Toaster position="top-right" theme="dark" richColors closeButton />
                     </>

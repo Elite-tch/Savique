@@ -1,7 +1,8 @@
 // -------------------- Config --------------------
 export const CONTRACTS = {
     coston2: {
-        VaultFactory: "0xfB3e3fc852a2178061F44C5FBd6D3b662c278b0d" as `0x${string}`,
+        VaultFactory: "0xA2e89a78dAfD31B47D9d84fF12cBF688B476d2FA" as `0x${string}`,
+        VaultMetadata: "0x2831598F989106b16BD6C79D71D4Ebe41E1eA13c" as `0x${string}`,
         USDTToken: "0xC1A5B41512496B80903D1f32d6dEa3a73212E71F" as `0x${string}`,
     },
 } as const;
@@ -28,7 +29,7 @@ export const VAULT_FACTORY_ABI = [
         type: "function"
     },
     {
-        inputs: [{ name: "user", type: "address" }],
+        inputs: [{ name: "_user", type: "address" }],
         name: "getUserVaults",
         outputs: [{ name: "", type: "address[]" }],
         stateMutability: "view",
@@ -49,6 +50,27 @@ export const VAULT_FACTORY_ABI = [
         type: "function"
     },
     {
+        inputs: [{ name: "tokenId", type: "uint256" }],
+        name: "ownerOf",
+        outputs: [{ name: "", type: "address" }],
+        stateMutability: "view",
+        type: "function"
+    },
+    {
+        inputs: [{ name: "tokenId", type: "uint256" }],
+        name: "tokenURI",
+        outputs: [{ name: "", type: "string" }],
+        stateMutability: "view",
+        type: "function"
+    },
+    {
+        inputs: [{ name: "owner", type: "address" }],
+        name: "balanceOf",
+        outputs: [{ name: "", type: "uint256" }],
+        stateMutability: "view",
+        type: "function"
+    },
+    {
         inputs: [{ name: "_vault", type: "address" }],
         name: "triggerBeneficiaryClaim",
         outputs: [],
@@ -64,6 +86,25 @@ export const VAULT_FACTORY_ABI = [
         outputs: [],
         stateMutability: "nonpayable",
         type: "function"
+    },
+    {
+        inputs: [{ name: "_newMetadata", type: "address" }],
+        name: "updateMetadataGenerator",
+        outputs: [],
+        stateMutability: "nonpayable",
+        type: "function"
+    },
+    {
+        anonymous: false,
+        inputs: [
+            { indexed: true, name: "vaultAddress", type: "address" },
+            { indexed: true, name: "owner", type: "address" },
+            { indexed: true, name: "tokenId", type: "uint256" },
+            { name: "purpose", type: "string" },
+            { name: "unlockTime", type: "uint256" }
+        ],
+        name: "PersonalVaultCreated",
+        type: "event"
     }
 ] as const;
 

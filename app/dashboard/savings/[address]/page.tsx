@@ -17,6 +17,7 @@ import { createNotification } from "@/lib/notificationService";
 import { getUserProfile } from "@/lib/userService";
 import { Progress } from "../../../../components/ui/progress";
 import { Loader2, Plus, ArrowUpCircle } from "lucide-react";
+import { proofRailsService } from "@/lib/proofRailsService";
 
 const MOTIVATION_QUOTES = [
     "Discipline is doing what needs to be done, even if you don't want to do it.",
@@ -91,18 +92,25 @@ export default function VaultDetailPage() {
         const fetchVault = async () => {
             if (address) {
                 const data = await getVaultByAddress(address);
-                setVaultData(data);
+                if (data) {
+                    setVaultData(data);
+
+                    // PROTECTION: If user is connected but NOT the owner, send them back
+                    if (userAddress && data.owner && userAddress.toLowerCase() !== data.owner.toLowerCase()) {
+                        console.warn("Unauthorized access to vault. Redirecting...");
+                        router.push("/dashboard/savings");
+                        return;
+                    }
+                }
 
                 // Fetch receipts
                 const receipts = await getReceiptsByVault(address);
                 const wr = receipts.find(r => r.type === 'completed' || r.type === 'breaked');
                 if (wr) setWithdrawalReceipt(wr);
-
-
             }
         };
         fetchVault();
-    }, [address]);
+    }, [address, userAddress, router]);
 
     // Contract interactions
     const { data: purpose } = useReadContract({ address, abi: VAULT_ABI, functionName: "purpose" });
@@ -135,15 +143,7 @@ export default function VaultDetailPage() {
         query: { enabled: !!userAddress },
     });
 
-    const accruedBonus = useMemo(() => {
-        if (!balanceResult || !vaultData || !decimals) return "0.000";
-        const bal = parseFloat(formatUnits(balanceResult, decimals as number || 18));
-        const now = Date.now();
-        const start = vaultData.createdAt;
-        const elapsedYears = (now - start) / (1000 * 60 * 60 * 24 * 365);
-        // Assuming 10% yield, user gets 10% share = 1% APY effective
-        return (bal * 0.01 * elapsedYears).toFixed(4);
-    }, [balanceResult, vaultData, decimals]);
+    // Brand Styled Toast
 
     // Brand Styled Toast
     const toastStyle = {
@@ -313,7 +313,23 @@ export default function VaultDetailPage() {
                 try {
                     console.log(`[${isDeposit ? 'Deposit' : 'Withdraw'}] Finalizing ${amountToSave} USDT0...`);
 
-                    // 1. Save Receipt to Firestore
+                    // 1b. Record on ProofRails ISO Ledger
+                    let prId = "";
+                    try {
+                        const prRes = await proofRailsService.recordTransaction({
+                            amount: amountToSave,
+                            currency: "USDT0",
+                            txHash: receipt.transactionHash,
+                            sender: userAddress!,
+                            receiver: address,
+                            reference: customPurpose || (isDeposit ? "Vault Top-up" : "Vault Withdrawal")
+                        });
+                        prId = prRes?.receipt_id || "";
+                    } catch (prErr) {
+                        console.warn("[ProofRails] Integration bypassed:", prErr);
+                    }
+
+                    // 1c. Save Receipt to Firestore
                     await saveReceipt({
                         walletAddress: userAddress!.toLowerCase(),
                         vaultAddress: address,
@@ -322,7 +338,8 @@ export default function VaultDetailPage() {
                         purpose: customPurpose,
                         amount: parseFloat(amountToSave).toFixed(2),
                         type: isDeposit ? 'created' : 'completed',
-                        verified: false
+                        verified: false,
+                        proofRailsId: prId
                     });
 
                     // 2. Notify User

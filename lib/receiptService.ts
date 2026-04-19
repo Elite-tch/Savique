@@ -20,6 +20,9 @@ export interface Receipt {
     verified: boolean;
     type: 'created' | 'breaked' | 'completed';
     penalty?: string;
+    proofRailsId?: string;
+    isoStatus?: 'anchored' | 'failed' | 'pending';
+    isoFlareTx?: string;
 }
 
 const RECEIPTS_COLLECTION = 'receipts';

@@ -271,6 +271,17 @@ function SavingsDashboard() {
     useEffect(() => {
         const loadAndCategorizeVaults = async () => {
             if (!address || !publicClient) return;
+            
+            // Check if we are on a supported chain (Coston2: 114, Flare: 14)
+            const chainId = await publicClient.getChainId();
+            if (chainId !== 114 && chainId !== 14) {
+                console.warn(`[Dashboard] Unsupported chain ID: ${chainId}. Expected 114 or 14.`);
+                setRawVaults([]);
+                setCompletedHistory([]);
+                setIsLoading(false);
+                return;
+            }
+
             setIsLoading(true);
             try {
                 // 1. Get unique vault addresses from DB and Chain in parallel
@@ -301,7 +312,16 @@ function SavingsDashboard() {
                 // Note: Promise.all is used because Coston2 doesn't have multicall3 configured in viem
                 // but wagmiConfig transport handles batching naturally.
                 const results = await Promise.all(uniqueAddresses.map(async (vaddr) => {
+                    if (!vaddr || vaddr === '0x0000000000000000000000000000000000000000') return null;
+                    
                     try {
+                        // First, verify the address is actually a contract on the current network
+                        const bytecode = await publicClient.getBytecode({ address: vaddr });
+                        if (!bytecode || bytecode === '0x') {
+                            console.warn(`[Dashboard] Skipping non-contract address: ${vaddr}`);
+                            return null;
+                        }
+
                         const [balanceResult, unlockResult] = await Promise.all([
                             publicClient.readContract({
                                 address: vaddr,
@@ -316,12 +336,16 @@ function SavingsDashboard() {
                         ]);
                         return { vaddr, balanceResult, unlockResult };
                     } catch (e) {
-                        console.error(`Error checking vault ${vaddr}:`, e);
+                        // Only log if it's not a standard "no data" error which we already handled with bytecode check
+                        const errorMessage = (e as any).message || "";
+                        if (!errorMessage.includes("no data") && !errorMessage.includes("returned no data")) {
+                            console.error(`Error checking vault ${vaddr}:`, e);
+                        }
                         return null;
                     }
                 }));
 
-                const validResults = results.filter(Boolean) as any[];
+                const validResults = results.filter((r): r is { vaddr: `0x${string}`, balanceResult: bigint, unlockResult: bigint } => r !== null);
                 setRawVaults(validResults);
 
                 // 3. Identification of completed (zero balance) vaults for Withdrawal tab
