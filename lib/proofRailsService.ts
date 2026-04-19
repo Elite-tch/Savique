@@ -6,7 +6,7 @@
  */
 
 const PROOFRAILS_API_URL = "/api/proofrails";
-const DIRECT_API_URL = "http://127.0.0.1:8000";
+const DIRECT_API_URL = "https://iso-middleware.onrender.com";
 
 export interface ReceiptResponse {
     receipt_id: string;

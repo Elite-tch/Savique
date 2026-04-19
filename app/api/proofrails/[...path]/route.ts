@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// Development: 127.0.0.1:8000
-const PROOFRAILS_API_URL = "http://127.0.0.1:8000";
+// Production: https://iso-middleware.onrender.com
+const PROOFRAILS_API_URL = "https://iso-middleware.onrender.com";
 const API_KEY = process.env.NEXT_PUBLIC_PROOFRAILS_KEY;
 
 export async function POST(
