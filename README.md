@@ -120,5 +120,5 @@ sequenceDiagram
 *   **Network**: Flare Coston2 Testnet
 *   **Factory Contract**: [`0x4E70a85B1553ef34128C13C52B81A5862e4A11Dc`](https://coston2-explorer.flare.network/address/0x4E70a85B1553ef34128C13C52B81A5862e4A11Dc)
 *   **Token**: Flare USDT0 (ERC-20)
-*   **Repository**: [GitHub Link](https://github.com/Elite-tch/Savique/tree/ship)
+*   **Repository**: [GitHub Link](https://github.com/Elite-tch/Savique.git)
 *   **Live DApp**: [https://testnet.savique.xyz/](https://testnet.savique.xyz/)
